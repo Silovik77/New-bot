@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # === НАСТРОЙКИ ===
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = "8278278864:AAFcWknKDxHS77Gbp6Re_DMEZn9hR3wb2qs"
 STREAM_URL = "https://www.twitch.tv/silovik_"
 CHANNEL_URL = "https://t.me/silovik_stream"
 SUPPORT_URL = "https://dalink.to/silovik_"
@@ -210,3 +210,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
