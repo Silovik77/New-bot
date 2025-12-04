@@ -46,7 +46,10 @@ def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
 
-# === РАСПИСАНИЕ (UTC), С УЧЁТОМ ВРЕМЕННОГО ОТКЛЮЧЕНИЯ HIDDEN BUNKER ===
+# === ТОЧНОЕ РАСПИСАНИЕ ИЗ ВАШЕГО KNOWLEDGE BASE (UTC) ===
+# Активные сейчас: Harvester (Dam), Lush Blooms (Blue Gate), Night Raid (Buried City), Prospecting Probes (Spaceport)
+# Предстоящие: Hidden Bunker (Spaceport) — временно исключён
+
 EVENT_SCHEDULE = [
     # 9:00–10:00 UTC → 12:00–13:00 МСК
     (9, "Harvester", ["Dam"]),
@@ -81,6 +84,7 @@ EVENT_SCHEDULE = [
 
     # 17:00–18:00 UTC → 20:00–21:00 МСК
     (17, "Electromagnetic Storm", ["Dam"]),
+    # (17, "Hidden Bunker", ["Blue Gate"]),  # ← ВРЕМЕННО УДАЛЁН
 
     # 18:00–19:00 UTC → 21:00–22:00 МСК
     (18, "Night Raid", ["Blue Gate"]),
@@ -108,16 +112,16 @@ EVENT_SCHEDULE = [
 ]
 
 
-# === ВЫЧИСЛЕНИЕ СОБЫТИЙ (в UTC, отображение — UTC+3) ===
+# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
 def get_current_events():
-    now_utc = datetime.now(timezone.utc)
-    current_hour = now_utc.hour
-    total_sec = now_utc.minute * 60 + now_utc.second
+    now = datetime.now(timezone.utc)
+    current_hour = now.hour
+    total_sec = now.minute * 60 + now.second
 
     active = []
     upcoming = []
 
-    # Активные события (в этом часу по UTC)
+    # Активные события (идут сейчас по UTC)
     for hour, event, maps in EVENT_SCHEDULE:
         if hour == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
@@ -173,7 +177,7 @@ async def events_handler(callback: CallbackQuery):
             parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
     if upcoming:
         parts.append("\n⏳ <b>Предстоящие:</b>")
-        for e in upcoming[:20]:
+        for e in upcoming[:10]:
             parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
 
     msg = "\n".join(parts)
