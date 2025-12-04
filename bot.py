@@ -46,107 +46,88 @@ def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
 
-# === ТОЧНОЕ РАСПИСАНИЕ (UTC) ИЗ САЙТА ===
+# === ТОЧНОЕ РАСПИСАНИЕ ИЗ ВАШЕГО KNOWLEDGE BASE (UTC) ===
+# Активные сейчас (9:00–10:00 UTC):
+#   Harvester (Dam), Lush Blooms (Blue Gate), Night Raid (Buried City), Prospecting Probes (Spaceport)
+# Предстоящие (10:00–11:00 UTC):
+#   Hidden Bunker (Spaceport), Husk Graveyard (Dam, Buried City, Blue Gate), Night Raid (Blue Gate), Prospecting Probes (Buried City)
+
 EVENT_SCHEDULE = [
-    # 9:00–10:00 UTC
+    # 9:00–10:00 UTC → 12:00–13:00 по Москве (UTC+3)
     (9, "Harvester", ["Dam"]),
     (9, "Lush Blooms", ["Blue Gate"]),
     (9, "Night Raid", ["Buried City"]),
     (9, "Prospecting Probes", ["Spaceport"]),
 
-    # 10:00–11:00 UTC
+    # 10:00–11:00 UTC → 13:00–14:00 по Москве
     (10, "Hidden Bunker", ["Spaceport"]),
     (10, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
     (10, "Night Raid", ["Blue Gate"]),
     (10, "Prospecting Probes", ["Buried City"]),
 
-    # 11:00–12:00 UTC
+    # 11:00–12:00 UTC → 14:00–15:00 по Москве
     (11, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
     (11, "Matriarch", ["Blue Gate"]),
 
-    # 12:00–13:00 UTC
+    # 12:00–13:00 UTC → 15:00–16:00 по Москве
     (12, "Harvester", ["Spaceport"]),
 
-    # 13:00–14:00 UTC
+    # 13:00–14:00 UTC → 16:00–17:00 по Москве
     (13, "Matriarch", ["Dam"]),
 
-    # 14:00–15:00 UTC
+    # 14:00–15:00 UTC → 17:00–18:00 по Москве
     (14, "Night Raid", ["Spaceport"]),
 
-    # 15:00–16:00 UTC
+    # 15:00–16:00 UTC → 18:00–19:00 по Москве
     (15, "Lush Blooms", ["Spaceport"]),
 
-    # 16:00–17:00 UTC
+    # 16:00–17:00 UTC → 19:00–20:00 по Москве
     (16, "Uncovered Caches", ["Dam"]),
     (16, "Husk Graveyard", ["Blue Gate"]),
 
-    # 17:00–18:00 UTC
+    # 17:00–18:00 UTC → 20:00–21:00 по Москве
     (17, "Electromagnetic Storm", ["Dam"]),
     (17, "Hidden Bunker", ["Blue Gate"]),
 
-    # 18:00–19:00 UTC
+    # 18:00–19:00 UTC → 21:00–22:00 по Москве
     (18, "Night Raid", ["Blue Gate"]),
     (18, "Prospecting Probes", ["Spaceport"]),
 
-    # 19:00–20:00 UTC
+    # 19:00–20:00 UTC → 22:00–23:00 по Москве
     (19, "Harvester", ["Blue Gate"]),
     (19, "Matriarch", ["Blue Gate"]),
 
-    # 20:00–21:00 UTC
+    # 20:00–21:00 UTC → 23:00–00:00 по Москве
     (20, "Lush Blooms", ["Blue Gate"]),
     (20, "Matriarch", ["Dam"]),
     (20, "Night Raid", ["Dam", "Stella Montis"]),
     (20, "Uncovered Caches", ["Buried City"]),
 
-    # 21:00–22:00 UTC
+    # 21:00–22:00 UTC → 00:00–01:00 по Москве
     (21, "Matriarch", ["Spaceport"]),
     (21, "Night Raid", ["Buried City"]),
 
-    # 22:00–23:00 UTC
+    # 22:00–23:00 UTC → 01:00–02:00 по Москве
     (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
 
-    # 23:00–00:00 UTC
+    # 23:00–00:00 UTC → 02:00–03:00 по Москве
     (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
 ]
 
-# === ОБНОВЛЕНИЯ ИГРЫ ===
-GAME_UPDATES = """
-🎮 <b>ARC Raiders — Последние обновления</b>
 
-🔖 <b>v1.2.5 (05.12.2025)</b>
-• Исправлен баг с исчезающими ящиками в Плотине
-• Уменьшен урон Жнеца на 15%
-• Добавлена новая карта: Стелла Монтиc
-• Оптимизация FPS на слабых ПК
-
-🔗 <b>Официальные ресурсы</b>
-• Сайт: https://arcreaiders.com  
-• Discord: https://discord.gg/arc-raiders
-"""
-
-
-# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ДЛЯ UTC+3 ===
+# === ВЫЧИСЛЕНИЕ СОБЫТИЙ (в UTC, как на сайте) ===
 def get_current_events():
-    # Текущее время в UTC+3 (Москва)
-    now_moscow = datetime.now(timezone(timedelta(hours=3)))
-    # Конвертируем в UTC для сравнения с расписанием
-    now_utc = now_moscow.astimezone(timezone.utc)
-
+    now_utc = datetime.now(timezone.utc)
     current_hour = now_utc.hour
-    minutes = now_utc.minute
-    seconds = now_utc.second
-    total_sec = minutes * 60 + seconds
+    total_sec = now_utc.minute * 60 + now_utc.second
 
     active = []
     upcoming = []
 
-    # Все события из расписания
+    # Активные события (идут прямо сейчас по UTC)
     for hour, event, maps in EVENT_SCHEDULE:
-        start_time_sec = hour * 3600
-
-        # Если событие идёт сейчас
-        if start_time_sec <= total_sec < start_time_sec + 3600:
-            time_left = start_time_sec + 3600 - total_sec
+        if hour == current_hour and total_sec < 3600:
+            time_left = 3600 - total_sec
             mins, secs = divmod(time_left, 60)
             for loc in maps:
                 active.append({
@@ -155,13 +136,11 @@ def get_current_events():
                     'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
                 })
 
-        # Считаем время до следующего окна (включая завтра)
-        else:
-            if total_sec < start_time_sec:
-                time_until = start_time_sec - total_sec
-            else:
-                time_until = (24 * 3600 - total_sec) + start_time_sec
-
+    # Предстоящие события (в следующем часу по UTC)
+    next_hour = (current_hour + 1) % 24
+    for hour, event, maps in EVENT_SCHEDULE:
+        if hour == next_hour:
+            time_until = 3600 - total_sec
             mins, secs = divmod(time_until, 60)
             for loc in maps:
                 upcoming.append({
@@ -169,11 +148,6 @@ def get_current_events():
                     'location': loc,
                     'info': f"Начнётся через {int(mins)}m {int(secs)}s"
                 })
-
-    # Сортируем предстоящие по времени
-    upcoming.sort(key=lambda x: int(x['info'].split()[2][:-1]) * 60 + int(x['info'].split()[3][:-1]))
-    # Берём только ближайшие 10
-    upcoming = upcoming[:10]
 
     return active, upcoming
 
@@ -188,7 +162,6 @@ router = Router()
 async def start_handler(message: Message):
     kb = InlineKeyboardBuilder()
     kb.button(text="📅 Все события", callback_data="events")
-    kb.button(text="🆕 Обновления игры", callback_data="updates")
     kb.button(text="📺 Мой стрим", url=STREAM_URL)
     kb.button(text="📢 Мой канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
@@ -207,7 +180,7 @@ async def events_handler(callback: CallbackQuery):
             parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
     if upcoming:
         parts.append("\n⏳ <b>Предстоящие:</b>")
-        for e in upcoming:
+        for e in upcoming[:20]:
             parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
 
     msg = "\n".join(parts)
@@ -216,7 +189,6 @@ async def events_handler(callback: CallbackQuery):
 
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="events")
-    kb.button(text="🆕 Обновления", callback_data="updates")
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
@@ -232,22 +204,6 @@ async def events_handler(callback: CallbackQuery):
             await callback.message.answer(msg, parse_mode="HTML", reply_markup=new_markup)
     else:
         await callback.answer("Данные не изменились.")
-
-
-@router.callback_query(lambda c: c.data == "updates")
-async def updates_handler(callback: CallbackQuery):
-    await callback.answer()
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🔄 Обновить", callback_data="updates")
-    kb.button(text="📅 Все события", callback_data="events")
-    kb.button(text="⬅️ Назад", callback_data="start")
-    kb.adjust(2)
-    await callback.message.edit_text(GAME_UPDATES, parse_mode="HTML", reply_markup=kb.as_markup())
-
-
-@router.callback_query(lambda c: c.data == "start")
-async def back_to_start(callback: CallbackQuery):
-    await start_handler(callback.message)
 
 
 dp.include_router(router)
