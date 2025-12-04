@@ -140,10 +140,13 @@ def get_current_events():
     active = []
     upcoming = []
 
-    # Текущие события (в этом часу по UTC)
+    # Все события из расписания
     for hour, event, maps in EVENT_SCHEDULE:
-        if hour == current_hour and total_sec < 3600:
-            time_left = 3600 - total_sec
+        start_time_sec = hour * 3600
+
+        # Если событие идёт сейчас
+        if start_time_sec <= total_sec < start_time_sec + 3600:
+            time_left = start_time_sec + 3600 - total_sec
             mins, secs = divmod(time_left, 60)
             for loc in maps:
                 active.append({
@@ -152,11 +155,13 @@ def get_current_events():
                     'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
                 })
 
-    # Предстоящие события (в следующем часу по UTC)
-    next_hour = (current_hour + 1) % 24
-    for hour, event, maps in EVENT_SCHEDULE:
-        if hour == next_hour:
-            time_until = 3600 - total_sec
+        # Считаем время до следующего окна (включая завтра)
+        else:
+            if total_sec < start_time_sec:
+                time_until = start_time_sec - total_sec
+            else:
+                time_until = (24 * 3600 - total_sec) + start_time_sec
+
             mins, secs = divmod(time_until, 60)
             for loc in maps:
                 upcoming.append({
@@ -164,6 +169,11 @@ def get_current_events():
                     'location': loc,
                     'info': f"Начнётся через {int(mins)}m {int(secs)}s"
                 })
+
+    # Сортируем предстоящие по времени
+    upcoming.sort(key=lambda x: int(x['info'].split()[2][:-1]) * 60 + int(x['info'].split()[3][:-1]))
+    # Берём только ближайшие 10
+    upcoming = upcoming[:10]
 
     return active, upcoming
 
@@ -197,7 +207,7 @@ async def events_handler(callback: CallbackQuery):
             parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
     if upcoming:
         parts.append("\n⏳ <b>Предстоящие:</b>")
-        for e in upcoming[:20]:
+        for e in upcoming:
             parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
 
     msg = "\n".join(parts)
