@@ -25,10 +25,10 @@ EVENTS_RU = {
     "Uncovered Caches": "Обнаруженные Тайники",
     "Electromagnetic Storm": "Электромагнитная Буря",
     "Harvester": "Жнец",
-    "Hidden Bunker": "Скрытый Бункер",
     "Husk Graveyard": "Кладбище Хасков",
     "Launch Tower Loot": "Добыча с Пусковой Башни",
     "Prospecting Probes": "Разведывательные Зонды",
+    # "Hidden Bunker": "Скрытый Бункер" — ВРЕМЕННО УДАЛЁН
 }
 
 MAPS_RU = {
@@ -46,76 +46,69 @@ def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
 
-# === ТОЧНОЕ РАСПИСАНИЕ ИЗ ВАШЕГО KNOWLEDGE BASE (UTC) ===
-# Активные сейчас (9:00–10:00 UTC):
-#   Harvester (Dam), Lush Blooms (Blue Gate), Night Raid (Buried City), Prospecting Probes (Spaceport)
-# Предстоящие (10:00–11:00 UTC):
-#   Hidden Bunker (Spaceport), Husk Graveyard (Dam, Buried City, Blue Gate), Night Raid (Blue Gate), Prospecting Probes (Buried City)
-
+# === РАСПИСАНИЕ (UTC), С УЧЁТОМ ВРЕМЕННОГО ОТКЛЮЧЕНИЯ HIDDEN BUNKER ===
 EVENT_SCHEDULE = [
-    # 9:00–10:00 UTC → 12:00–13:00 по Москве (UTC+3)
+    # 9:00–10:00 UTC → 12:00–13:00 МСК
     (9, "Harvester", ["Dam"]),
     (9, "Lush Blooms", ["Blue Gate"]),
     (9, "Night Raid", ["Buried City"]),
     (9, "Prospecting Probes", ["Spaceport"]),
 
-    # 10:00–11:00 UTC → 13:00–14:00 по Москве
-    (10, "Hidden Bunker", ["Spaceport"]),
+    # 10:00–11:00 UTC → 13:00–14:00 МСК
     (10, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
     (10, "Night Raid", ["Blue Gate"]),
     (10, "Prospecting Probes", ["Buried City"]),
 
-    # 11:00–12:00 UTC → 14:00–15:00 по Москве
+    # 11:00–12:00 UTC → 14:00–15:00 МСК
     (11, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
     (11, "Matriarch", ["Blue Gate"]),
 
-    # 12:00–13:00 UTC → 15:00–16:00 по Москве
+    # 12:00–13:00 UTC → 15:00–16:00 МСК
     (12, "Harvester", ["Spaceport"]),
 
-    # 13:00–14:00 UTC → 16:00–17:00 по Москве
+    # 13:00–14:00 UTC → 16:00–17:00 МСК
     (13, "Matriarch", ["Dam"]),
 
-    # 14:00–15:00 UTC → 17:00–18:00 по Москве
+    # 14:00–15:00 UTC → 17:00–18:00 МСК
     (14, "Night Raid", ["Spaceport"]),
 
-    # 15:00–16:00 UTC → 18:00–19:00 по Москве
+    # 15:00–16:00 UTC → 18:00–19:00 МСК
     (15, "Lush Blooms", ["Spaceport"]),
 
-    # 16:00–17:00 UTC → 19:00–20:00 по Москве
+    # 16:00–17:00 UTC → 19:00–20:00 МСК
     (16, "Uncovered Caches", ["Dam"]),
     (16, "Husk Graveyard", ["Blue Gate"]),
 
-    # 17:00–18:00 UTC → 20:00–21:00 по Москве
+    # 17:00–18:00 UTC → 20:00–21:00 МСК
     (17, "Electromagnetic Storm", ["Dam"]),
-    (17, "Hidden Bunker", ["Blue Gate"]),
 
-    # 18:00–19:00 UTC → 21:00–22:00 по Москве
+    # 18:00–19:00 UTC → 21:00–22:00 МСК
     (18, "Night Raid", ["Blue Gate"]),
     (18, "Prospecting Probes", ["Spaceport"]),
 
-    # 19:00–20:00 UTC → 22:00–23:00 по Москве
+    # 19:00–20:00 UTC → 22:00–23:00 МСК
     (19, "Harvester", ["Blue Gate"]),
     (19, "Matriarch", ["Blue Gate"]),
 
-    # 20:00–21:00 UTC → 23:00–00:00 по Москве
+    # 20:00–21:00 UTC → 23:00–00:00 МСК
     (20, "Lush Blooms", ["Blue Gate"]),
     (20, "Matriarch", ["Dam"]),
     (20, "Night Raid", ["Dam", "Stella Montis"]),
     (20, "Uncovered Caches", ["Buried City"]),
 
-    # 21:00–22:00 UTC → 00:00–01:00 по Москве
+    # 21:00–22:00 UTC → 00:00–01:00 МСК
     (21, "Matriarch", ["Spaceport"]),
     (21, "Night Raid", ["Buried City"]),
 
-    # 22:00–23:00 UTC → 01:00–02:00 по Москве
+    # 22:00–23:00 UTC → 01:00–02:00 МСК
     (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
 
-    # 23:00–00:00 UTC → 02:00–03:00 по Москве
+    # 23:00–00:00 UTC → 02:00–03:00 МСК
     (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
 ]
 
 
-# === ВЫЧИСЛЕНИЕ СОБЫТИЙ (в UTC, как на сайте) ===
+# === ВЫЧИСЛЕНИЕ СОБЫТИЙ (в UTC, отображение — UTC+3) ===
 def get_current_events():
     now_utc = datetime.now(timezone.utc)
     current_hour = now_utc.hour
@@ -124,7 +117,7 @@ def get_current_events():
     active = []
     upcoming = []
 
-    # Активные события (идут прямо сейчас по UTC)
+    # Активные события (в этом часу по UTC)
     for hour, event, maps in EVENT_SCHEDULE:
         if hour == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
@@ -166,7 +159,7 @@ async def start_handler(message: Message):
     kb.button(text="📢 Мой канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: события и новости", reply_markup=kb.as_markup())
+    await message.answer("🎮 ARC Raiders: текущие и предстоящие события", reply_markup=kb.as_markup())
 
 
 @router.callback_query(lambda c: c.data == "events")
