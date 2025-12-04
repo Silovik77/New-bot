@@ -8,7 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import datetime, timezone
 
 # === НАСТРОЙКИ ===
-BOT_TOKEN=8278278864:AAFcWknKDxHS77Gbp6Re_DMEZn9hR3wb2qs
+BOT_TOKEN = "8278278864:AAFcWknKDxHS77Gbp6Re_DMEZn9hR3wb2qs"
 
 # === ВАШИ ССЫЛКИ ===
 STREAM_URL = "https://www.twitch.tv/silovik_"
