@@ -48,73 +48,86 @@ def tr_map(name): return MAPS_RU.get(name, name)
 
 
 # === СТАТИЧНОЕ РАСПИСАНИЕ СОБЫТИЙ (UTC) ===
-EVENT_SCHEDULE = [
-    # (час_UTC, событие, [карты])
-    (20, "Lush Blooms", ["Blue Gate"]),
-    (20, "Matriarch", ["Dam"]),
-    (20, "Night Raid", ["Dam", "Stella Montis"]),
-    (20, "Uncovered Caches", ["Buried City"]),
+from datetime import datetime, timezone, timedelta
 
-    (21, "Matriarch", ["Spaceport"]),
-    (21, "Night Raid", ["Buried City"]),
 
-    (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
+def get_current_events():
+    now = datetime.now(timezone.utc)
+    current_hour = now.hour
+    minutes = now.minute
+    seconds = now.second
+    total_sec = minutes * 60 + seconds
 
-    (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
+    # Полное расписание (UTC)
+    SCHEDULE = [
+        (9, "Harvester", ["Dam"]),
+        (9, "Lush Blooms", ["Blue Gate"]),
+        (9, "Night Raid", ["Buried City"]),
+        (9, "Prospecting Probes", ["Spaceport"]),
 
-    (0, "Harvester", ["Dam"]),
-    (0, "Launch Tower Loot", ["Spaceport"]),
+        (10, "Hidden Bunker", ["Spaceport"]),
+        (10, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
+        (10, "Night Raid", ["Blue Gate"]),
+        (10, "Prospecting Probes", ["Buried City"]),
 
-    (1, "Hidden Bunker", ["Spaceport"]),
+        (11, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
+        (11, "Matriarch", ["Blue Gate"]),
 
-    (2, "Uncovered Caches", ["Blue Gate"]),
+        (12, "Harvester", ["Spaceport"]),
+        (13, "Matriarch", ["Dam"]),
+        (14, "Night Raid", ["Spaceport"]),
+        (15, "Lush Blooms", ["Spaceport"]),
+        (16, "Uncovered Caches", ["Dam"]),
+        (16, "Husk Graveyard", ["Blue Gate"]),
+        (17, "Electromagnetic Storm", ["Dam"]),
+        (17, "Hidden Bunker", ["Blue Gate"]),
+        (18, "Night Raid", ["Blue Gate"]),
+        (18, "Prospecting Probes", ["Spaceport"]),
+        (19, "Harvester", ["Blue Gate"]),
+        (19, "Matriarch", ["Blue Gate"]),
 
-    (3, "Husk Graveyard", ["Dam"]),
+        (20, "Lush Blooms", ["Blue Gate"]),
+        (20, "Matriarch", ["Dam"]),
+        (20, "Night Raid", ["Dam", "Stella Montis"]),
+        (20, "Uncovered Caches", ["Buried City"]),
 
-    (4, "Electromagnetic Storm", ["Spaceport"]),
-    (4, "Harvester", ["Spaceport"]),
+        (21, "Matriarch", ["Spaceport"]),
+        (21, "Night Raid", ["Buried City"]),
 
-    (5, "Lush Blooms", ["Buried City"]),
-    (5, "Matriarch", ["Blue Gate"]),
-    (5, "Husk Graveyard", ["Blue Gate"]),
+        (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
 
-    (6, "Launch Tower Loot", ["Spaceport"]),
+        (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
+    ]
 
-    (7, "Hidden Bunker", ["Spaceport"]),
-    (7, "Husk Graveyard", ["Buried City"]),
+    active = []
+    upcoming = []
 
-    (8, "Lush Blooms", ["Buried City"]),
+    # Текущие события
+    for hour, event, maps in SCHEDULE:
+        if hour == current_hour and total_sec < 3600:
+            time_left = 3600 - total_sec
+            mins, secs = divmod(time_left, 60)
+            for loc in maps:
+                active.append({
+                    'name': event,
+                    'location': loc,
+                    'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
+                })
 
-    (9, "Matriarch", ["Spaceport"]),
-    (9, "Prospecting Probes", ["Dam"]),
-    (9, "Lush Blooms", ["Blue Gate"]),
+    # Следующие события
+    next_hour = (current_hour + 1) % 24
+    for hour, event, maps in SCHEDULE:
+        if hour == next_hour:
+            time_until = 3600 - total_sec
+            mins, secs = divmod(time_until, 60)
+            for loc in maps:
+                upcoming.append({
+                    'name': event,
+                    'location': loc,
+                    'info': f"Начнётся через {int(mins)}m {int(secs)}s"
+                })
 
-    (10, "Electromagnetic Storm", ["Blue Gate"]),
-    (10, "Husk Graveyard", ["Dam"]),
-    (10, "Hidden Bunker", ["Spaceport"]),
-
-    (11, "Prospecting Probes", ["Buried City"]),
-
-    (12, "Harvester", ["Spaceport"]),
-
-    (13, "Matriarch", ["Dam"]),
-
-    (14, "Night Raid", ["Spaceport"]),
-
-    (15, "Lush Blooms", ["Spaceport"]),
-
-    (16, "Uncovered Caches", ["Dam"]),
-    (16, "Husk Graveyard", ["Blue Gate"]),
-
-    (17, "Electromagnetic Storm", ["Dam"]),
-    (17, "Hidden Bunker", ["Blue Gate"]),
-
-    (18, "Night Raid", ["Blue Gate"]),
-    (18, "Prospecting Probes", ["Spaceport"]),
-
-    (19, "Harvester", ["Blue Gate"]),
-    (19, "Matriarch", ["Blue Gate"]),
-]
+    return active, upcoming
 
 # === ОБНОВЛЕНИЯ ИГРЫ ===
 GAME_UPDATES = """
