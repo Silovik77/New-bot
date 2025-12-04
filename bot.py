@@ -5,10 +5,9 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # === НАСТРОЙКИ ===
-import os
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
@@ -47,10 +46,70 @@ def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
 
-# === СТАТИЧНОЕ РАСПИСАНИЕ СОБЫТИЙ (UTC) ===
-from datetime import datetime, timezone, timedelta
+# === ТОЧНОЕ РАСПИСАНИЕ (UTC) ИЗ metaforge.app ===
+EVENT_SCHEDULE = [
+    # (час_UTC, событие, [карты])
+    (9, "Harvester", ["Dam"]),
+    (9, "Lush Blooms", ["Blue Gate"]),
+    (9, "Night Raid", ["Buried City"]),
+    (9, "Prospecting Probes", ["Spaceport"]),
+
+    (10, "Hidden Bunker", ["Spaceport"]),
+    (10, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
+    (10, "Night Raid", ["Blue Gate"]),
+    (10, "Prospecting Probes", ["Buried City"]),
+
+    (11, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
+    (11, "Matriarch", ["Blue Gate"]),
+
+    (12, "Harvester", ["Spaceport"]),
+    (13, "Matriarch", ["Dam"]),
+    (14, "Night Raid", ["Spaceport"]),
+    (15, "Lush Blooms", ["Spaceport"]),
+    (16, "Uncovered Caches", ["Dam"]),
+    (16, "Husk Graveyard", ["Blue Gate"]),
+    (17, "Electromagnetic Storm", ["Dam"]),
+    (17, "Hidden Bunker", ["Blue Gate"]),
+    (18, "Night Raid", ["Blue Gate"]),
+    (18, "Prospecting Probes", ["Spaceport"]),
+    (19, "Harvester", ["Blue Gate"]),
+    (19, "Matriarch", ["Blue Gate"]),
+
+    (20, "Lush Blooms", ["Blue Gate"]),
+    (20, "Matriarch", ["Dam"]),
+    (20, "Night Raid", ["Dam", "Stella Montis"]),
+    (20, "Uncovered Caches", ["Buried City"]),
+
+    (21, "Matriarch", ["Spaceport"]),
+    (21, "Night Raid", ["Buried City"]),
+
+    (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
+
+    (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
+]
+
+# === ОБНОВЛЕНИЯ ИГРЫ ===
+GAME_UPDATES = """
+🎮 <b>ARC Raiders — Последние обновления</b>
+
+🔖 <b>v1.2.5 (05.12.2025)</b>
+• Исправлен баг с исчезающими ящиками в Плотине
+• Уменьшен урон Жнеца на 15%
+• Добавлена новая карта: Стелла Монтиc
+• Оптимизация FPS на слабых ПК
+
+🔖 <b>v1.2.4 (28.11.2025)</b>
+• Исправлен вылет при входе в подземелья
+• Снижена длительность Ночного Налёта
+• Исправлено отображение событий в UTC
+
+🔗 <b>Официальные ресурсы</b>
+• Сайт: https://arcreaiders.com  
+• Discord: https://discord.gg/arc-raiders
+"""
 
 
+# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ПО РАСПИСАНИЮ ===
 def get_current_events():
     now = datetime.now(timezone.utc)
     current_hour = now.hour
@@ -58,52 +117,11 @@ def get_current_events():
     seconds = now.second
     total_sec = minutes * 60 + seconds
 
-    # Полное расписание (UTC)
-    SCHEDULE = [
-        (9, "Harvester", ["Dam"]),
-        (9, "Lush Blooms", ["Blue Gate"]),
-        (9, "Night Raid", ["Buried City"]),
-        (9, "Prospecting Probes", ["Spaceport"]),
-
-        (10, "Hidden Bunker", ["Spaceport"]),
-        (10, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
-        (10, "Night Raid", ["Blue Gate"]),
-        (10, "Prospecting Probes", ["Buried City"]),
-
-        (11, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
-        (11, "Matriarch", ["Blue Gate"]),
-
-        (12, "Harvester", ["Spaceport"]),
-        (13, "Matriarch", ["Dam"]),
-        (14, "Night Raid", ["Spaceport"]),
-        (15, "Lush Blooms", ["Spaceport"]),
-        (16, "Uncovered Caches", ["Dam"]),
-        (16, "Husk Graveyard", ["Blue Gate"]),
-        (17, "Electromagnetic Storm", ["Dam"]),
-        (17, "Hidden Bunker", ["Blue Gate"]),
-        (18, "Night Raid", ["Blue Gate"]),
-        (18, "Prospecting Probes", ["Spaceport"]),
-        (19, "Harvester", ["Blue Gate"]),
-        (19, "Matriarch", ["Blue Gate"]),
-
-        (20, "Lush Blooms", ["Blue Gate"]),
-        (20, "Matriarch", ["Dam"]),
-        (20, "Night Raid", ["Dam", "Stella Montis"]),
-        (20, "Uncovered Caches", ["Buried City"]),
-
-        (21, "Matriarch", ["Spaceport"]),
-        (21, "Night Raid", ["Buried City"]),
-
-        (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
-
-        (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
-    ]
-
     active = []
     upcoming = []
 
-    # Текущие события
-    for hour, event, maps in SCHEDULE:
+    # Текущие события (в этом часу)
+    for hour, event, maps in EVENT_SCHEDULE:
         if hour == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
             mins, secs = divmod(time_left, 60)
@@ -114,9 +132,9 @@ def get_current_events():
                     'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
                 })
 
-    # Следующие события
+    # Предстоящие события (следующий час)
     next_hour = (current_hour + 1) % 24
-    for hour, event, maps in SCHEDULE:
+    for hour, event, maps in EVENT_SCHEDULE:
         if hour == next_hour:
             time_until = 3600 - total_sec
             mins, secs = divmod(time_until, 60)
@@ -125,62 +143,6 @@ def get_current_events():
                     'name': event,
                     'location': loc,
                     'info': f"Начнётся через {int(mins)}m {int(secs)}s"
-                })
-
-    return active, upcoming
-
-# === ОБНОВЛЕНИЯ ИГРЫ ===
-GAME_UPDATES = """
-🎮 <b>ARC Raiders — Последние обновления</b>
-
-🔖 <b>v1.2.5 (05.12.2025)</b>
-• Исправлен баг с исчезающими ящиками в Плотине
-• Уменьшен урон Жнеца на 15%
-• Добавлена новая карта: Стелла Монтиc (на пробе)
-• Оптимизация FPS на слабых ПК
-
-🔖 <b>v1.2.4 (28.11.2025)</b>
-• Исправлен вылет при входе в подземелья
-• Снижена длительность Ночного Налёта с 2ч до 1ч
-• Исправлено отображение событий в UTC
-
-🔗 <b>Официальные ресурсы</b>
-• Сайт: https://arcreaiders.com  
-• Discord: https://discord.gg/arc-raiders
-"""
-
-
-# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
-def get_current_events():
-    now = datetime.now(timezone.utc)
-    current_hour = now.hour
-    minutes = now.minute
-    seconds = now.second
-    total_seconds = minutes * 60 + seconds
-
-    active = []
-    upcoming = []
-
-    for hour, event, maps in EVENT_SCHEDULE:
-        if hour == current_hour and total_seconds < 3600:
-            # Событие идёт сейчас
-            time_left = 3600 - total_seconds
-            mins, secs = divmod(time_left, 60)
-            for loc in maps:
-                active.append({
-                    'name': event,
-                    'location': loc,
-                    'info': f"Заканчивается через {mins}m {secs}s"
-                })
-        elif (hour == (current_hour + 1) % 24):
-            # Событие начнётся через (3600 - total_seconds) секунд
-            time_until = 3600 - total_seconds
-            mins, secs = divmod(time_until, 60)
-            for loc in maps:
-                upcoming.append({
-                    'name': event,
-                    'location': loc,
-                    'info': f"Начнётся через {mins}m {secs}s"
                 })
 
     return active, upcoming
@@ -230,6 +192,7 @@ async def events_handler(callback: CallbackQuery):
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
 
+    # Обход ошибки "message is not modified"
     current_text = callback.message.text or ""
     current_markup = callback.message.reply_markup
     new_markup = kb.as_markup()
