@@ -1,86 +1,21 @@
 import asyncio
-from datetime import datetime, timezone, timedelta
+import logging
+import os
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # === НАСТРОЙКИ ===
-BOT_TOKEN = "8278278864:AAFcWknKDxHS77Gbp6Re_DMEZn9hR3wb2qs"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("Переменная окружения BOT_TOKEN не задана!")
+
+URL = "https://metaforge.app/arc-raiders/event-timers"
 STREAM_URL = "https://www.twitch.tv/silovik_"
 CHANNEL_URL = "https://t.me/silovik_stream"
 SUPPORT_URL = "https://dalink.to/silovik_"
 
-# === РАСПИСАНИЕ СОБЫТИЙ (UTC) ===
-EVENT_SCHEDULE = [
-    # (начало_часа, событие, [карты])
-    (20, "Lush Blooms", ["Blue Gate"]),
-    (20, "Matriarch", ["Dam"]),
-    (20, "Night Raid", ["Dam", "Stella Montis"]),
-    (20, "Uncovered Caches", ["Buried City"]),
-
-    (21, "Matriarch", ["Spaceport"]),
-    (21, "Night Raid", ["Buried City"]),
-
-    (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
-
-    (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
-
-    (0, "Harvester", ["Dam"]),
-    (0, "Launch Tower Loot", ["Spaceport"]),
-
-    (1, "Hidden Bunker", ["Spaceport"]),
-
-    (2, "Uncovered Caches", ["Blue Gate"]),
-
-    (3, "Husk Graveyard", ["Dam"]),
-
-    (4, "Electromagnetic Storm", ["Spaceport"]),
-    (4, "Harvester", ["Spaceport"]),
-
-    (5, "Lush Blooms", ["Buried City"]),
-    (5, "Matriarch", ["Blue Gate"]),
-    (5, "Husk Graveyard", ["Blue Gate"]),
-
-    (6, "Launch Tower Loot", ["Spaceport"]),
-
-    (7, "Hidden Bunker", ["Spaceport"]),
-    (7, "Husk Graveyard", ["Buried City"]),
-
-    (8, "Lush Blooms", ["Buried City"]),
-
-    (9, "Matriarch", ["Spaceport"]),
-    (9, "Prospecting Probes", ["Dam"]),
-    (9, "Lush Blooms", ["Blue Gate"]),
-
-    (10, "Electromagnetic Storm", ["Blue Gate"]),
-    (10, "Husk Graveyard", ["Dam"]),
-    (10, "Hidden Bunker", ["Spaceport"]),
-
-    (11, "Prospecting Probes", ["Buried City"]),
-
-    (12, "Harvester", ["Spaceport"]),
-
-    (13, "Matriarch", ["Dam"]),
-
-    (14, "Night Raid", ["Spaceport"]),
-
-    (15, "Lush Blooms", ["Spaceport"]),
-
-    (16, "Uncovered Caches", ["Dam"]),
-    (16, "Husk Graveyard", ["Blue Gate"]),
-
-    (17, "Electromagnetic Storm", ["Dam"]),
-    (17, "Hidden Bunker", ["Blue Gate"]),
-
-    (18, "Night Raid", ["Blue Gate"]),
-    (18, "Prospecting Probes", ["Spaceport"]),
-
-    (19, "Harvester", ["Blue Gate"]),
-    (19, "Matriarch", ["Blue Gate"]),
-]
-
-# === ПЕРЕВОДЫ ===
 # === ПЕРЕВОДЫ ===
 EVENTS_RU = {
     "Lush Blooms": "Пышное Цветение",
@@ -106,88 +41,147 @@ MAPS_RU = {
 def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
-# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
-def get_current_events():
-    """Возвращает активные и предстоящие события на основе текущего UTC-времени."""
-    now = datetime.now(timezone.utc)
-    current_hour = now.hour
-    minutes = now.minute
-    seconds = now.second
-    total_seconds = minutes * 60 + seconds
+# === ОБНОВЛЕНИЯ ИГРЫ ===
+GAME_UPDATES = """
+🎮 <b>ARC Raiders — Последние обновления</b>
 
-    active = []
-    upcoming = []
+🔖 <b>v1.2.5 (04.12.2025)</b>
+• Исправлен баг с исчезающими ящиками в Плотине
+• Уменьшен урон Жнеца на 15%
+• Добавлена новая карта: Стелла Монтиc (на пробе)
+• Оптимизация FPS на слабых ПК
 
-    # Проверяем все события за текущий и следующий час
-    for hour, event, maps in EVENT_SCHEDULE:
-        if hour == current_hour:
-            # Событие идёт сейчас (если прошло < 3600 сек)
-            if total_seconds < 3600:
-                time_left = 3600 - total_seconds
-                mins, secs = divmod(time_left, 60)
-                for loc in maps:
-                    active.append({
-                        'name': event,
-                        'location': loc,
-                        'info': f"Заканчивается через {mins}m {secs}s"
-                    })
-        elif (hour == (current_hour + 1) % 24):
-            # Событие начнётся через (3600 - total_seconds) секунд
-            time_until = 3600 - total_seconds
-            mins, secs = divmod(time_until, 60)
-            for loc in maps:
-                upcoming.append({
-                    'name': event,
-                    'location': loc,
-                    'info': f"Начнётся через {mins}m {secs}s"
-                })
+🔖 <b>v1.2.4 (28.11.2025)</b>
+• Исправлен вылет при входе в подземелья
+• Снижена длительность Ночного Налёта с 2ч до 1ч
+• Исправлено отображение событий в UTC
 
-    return active, upcoming
+🔖 <b>Следите за новостями!</b>
+• Официальный сайт: https://arcreaiders.com  
+• Discord: https://discord.gg/arc-raiders
+"""
 
+# === ПАРСИНГ СОБЫТИЙ ИЗ HTML ===
+def parse_events_from_html(html_text):
+    events = []
+    lines = [line.strip() for line in html_text.splitlines() if line.strip()]
+
+    try:
+        i_active = lines.index("Active now")
+        i_upcoming = lines.index("Upcoming next")
+    except ValueError:
+        i_active = -1
+        i_upcoming = len(lines)
+
+    # Активные события
+    if i_active != -1:
+        i = i_active + 1
+        while i < i_upcoming:
+            line = lines[i]
+            if line.startswith("!") or not line:
+                i += 1
+                continue
+            if "Ends in" in line:
+                parts = line.split(" Ends in ", 1)
+                if len(parts) == 2:
+                    name_loc = parts[0].strip()
+                    time_left = parts[1].strip()
+                    for ev in EVENTS_RU:
+                        if name_loc.startswith(ev):
+                            loc = name_loc[len(ev):].strip()
+                            if loc:
+                                events.append({
+                                    'name': ev,
+                                    'location': loc,
+                                    'info': f"Заканчивается через {time_left}",
+                                    'type': 'active'
+                                })
+                            break
+            i += 1
+
+    # Предстоящие события
+    if i_upcoming != -1:
+        i = i_upcoming + 1
+        while i < len(lines) and not lines[i].startswith("####"):
+            line = lines[i]
+            if line.startswith("!") or not line:
+                i += 1
+                continue
+            if "Starts in" in line:
+                parts = line.split(" Starts in ", 1)
+                if len(parts) == 2:
+                    name_loc = parts[0].strip()
+                    time_left = parts[1].strip()
+                    for ev in EVENTS_RU:
+                        if name_loc.startswith(ev):
+                            loc = name_loc[len(ev):].strip()
+                            if loc:
+                                events.append({
+                                    'name': ev,
+                                    'location': loc,
+                                    'info': f"Начнётся через {time_left}",
+                                    'type': 'upcoming'
+                                })
+                            break
+            i += 1
+
+    return events
 
 # === TELEGRAM ===
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 router = Router()
 
-
 @router.message(Command("start"))
 async def start_handler(message: Message):
     kb = InlineKeyboardBuilder()
     kb.button(text="📅 Все события", callback_data="events")
+    kb.button(text="🆕 Обновления игры", callback_data="updates")
     kb.button(text="📺 Мой стрим", url=STREAM_URL)
     kb.button(text="📢 Мой канал", url=CHANNEL_URL)
-    kb.button(text="💸 Поддержка", url=SUPPORT_URL)
+    kb.button(text="💰 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: события по картам", reply_markup=kb.as_markup())
-
+    await message.answer("🎮 ARC Raiders: события и новости", reply_markup=kb.as_markup())
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
-    active, upcoming = get_current_events()
+    await callback.answer()
+    import requests
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(URL, headers=headers, timeout=10)
+        resp.raise_for_status()
+        events = parse_events_from_html(resp.text)
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Ошибка загрузки: {e}")
+        return
 
-    parts = ["🎮 <b>ARC Raiders: События</b> (время в UTC)\n"]
-    if active:
-        parts.append("🟢 <b>Активные:</b>")
-        for e in active:
-            parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
-    if upcoming:
-        parts.append("\n⏳ <b>Предстоящие:</b>")
-        for e in upcoming[:20]:
-            parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
-
-    msg = "\n".join(parts)
-    if len(msg) > 4000:
-        msg = msg[:3990] + "\n\n... (список усечён)"
+    if not events:
+        msg = "🕗 Нет событий."
+    else:
+        active = [e for e in events if e['type'] == 'active']
+        upcoming = [e for e in events if e['type'] == 'upcoming']
+        parts = ["🎮 <b>ARC Raiders: События</b> (время в UTC)\n"]
+        if active:
+            parts.append("🟢 <b>Активные:</b>")
+            for e in active:
+                parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
+        if upcoming:
+            parts.append("\n⏳ <b>Предстоящие:</b>")
+            for e in upcoming[:20]:
+                parts.append(f" • <b>{tr_event(e['name'])}</b> (<b>{tr_map(e['location'])}</b>) — {e['info']}")
+        msg = "\n".join(parts)
+        if len(msg) > 4000:
+            msg = msg[:3990] + "\n\n... (список усечён)"
 
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="events")
+    kb.button(text="🆕 Обновления", callback_data="updates")
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
 
-    # Обход ошибки "message is not modified"
     current_text = callback.message.text or ""
     current_markup = callback.message.reply_markup
     new_markup = kb.as_markup()
@@ -199,15 +193,26 @@ async def events_handler(callback: CallbackQuery):
     else:
         await callback.answer("Данные не изменились.")
 
+@router.callback_query(lambda c: c.data == "updates")
+async def updates_handler(callback: CallbackQuery):
+    await callback.answer()
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="updates")
+    kb.button(text="📅 Все события", callback_data="events")
+    kb.button(text="⬅️ Назад", callback_data="start")
+    kb.adjust(2)
+    await callback.message.edit_text(GAME_UPDATES, parse_mode="HTML", reply_markup=kb.as_markup())
+
+@router.callback_query(lambda c: c.data == "start")
+async def back_to_start(callback: CallbackQuery):
+    await start_handler(callback.message)
 
 dp.include_router(router)
 
-
 async def main():
+    logging.basicConfig(level=logging.INFO)
+    print("✅ ARC Raiders Telegram-бот запущен!")
     await dp.start_polling(bot)
 
-
 if __name__ == "__main__":
-
     asyncio.run(main())
-
