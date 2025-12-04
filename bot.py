@@ -112,16 +112,20 @@ EVENT_SCHEDULE = [
 
 # === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
 def get_current_events():
-    now = datetime.now(timezone.utc)
-    current_hour = now.hour
-    minutes = now.minute
-    seconds = now.second
+    # Получаем текущее время в UTC+3 (Москва)
+    now_moscow = datetime.now(timezone(timedelta(hours=3)))
+    # Конвертируем в UTC для сравнения с расписанием
+    now_utc = now_moscow.astimezone(timezone.utc)
+
+    current_hour = now_utc.hour
+    minutes = now_utc.minute
+    seconds = now_utc.second
     total_sec = minutes * 60 + seconds
 
     active = []
     upcoming = []
 
-    # Текущие события (в этом часу)
+    # Текущие события (в этом часу по UTC)
     for hour, event, maps in EVENT_SCHEDULE:
         if hour == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
@@ -133,7 +137,7 @@ def get_current_events():
                     'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
                 })
 
-    # Предстоящие события (в следующем часу)
+    # Следующие события (в следующем часу по UTC)
     next_hour = (current_hour + 1) % 24
     for hour, event, maps in EVENT_SCHEDULE:
         if hour == next_hour:
