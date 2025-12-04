@@ -157,7 +157,7 @@ async def start_handler(message: Message):
     kb.button(text="📅 Все события", callback_data="events")
     kb.button(text="📺 Мой стрим", url=STREAM_URL)
     kb.button(text="📢 Мой канал", url=CHANNEL_URL)
-    kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
+    kb.button(text="💸 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
     await message.answer("🎮 ARC Raiders: события по картам", reply_markup=kb.as_markup())
 
