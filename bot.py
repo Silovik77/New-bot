@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # === НАСТРОЙКИ ===
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -46,7 +46,7 @@ def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
 
-# === ТОЧНОЕ РАСПИСАНИЕ (UTC) ИЗ ОФИЦИАЛЬНОГО ИСТОЧНИКА ===
+# === ТОЧНОЕ РАСПИСАНИЕ (UTC) ИЗ САЙТА ===
 EVENT_SCHEDULE = [
     # 9:00–10:00 UTC
     (9, "Harvester", ["Dam"]),
@@ -109,10 +109,25 @@ EVENT_SCHEDULE = [
     (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
 ]
 
+# === ОБНОВЛЕНИЯ ИГРЫ ===
+GAME_UPDATES = """
+🎮 <b>ARC Raiders — Последние обновления</b>
 
-# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
+🔖 <b>v1.2.5 (05.12.2025)</b>
+• Исправлен баг с исчезающими ящиками в Плотине
+• Уменьшен урон Жнеца на 15%
+• Добавлена новая карта: Стелла Монтиc
+• Оптимизация FPS на слабых ПК
+
+🔗 <b>Официальные ресурсы</b>
+• Сайт: https://arcreaiders.com  
+• Discord: https://discord.gg/arc-raiders
+"""
+
+
+# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ДЛЯ UTC+3 ===
 def get_current_events():
-    # Получаем текущее время в UTC+3 (Москва)
+    # Текущее время в UTC+3 (Москва)
     now_moscow = datetime.now(timezone(timedelta(hours=3)))
     # Конвертируем в UTC для сравнения с расписанием
     now_utc = now_moscow.astimezone(timezone.utc)
@@ -137,7 +152,7 @@ def get_current_events():
                     'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
                 })
 
-    # Следующие события (в следующем часу по UTC)
+    # Предстоящие события (в следующем часу по UTC)
     next_hour = (current_hour + 1) % 24
     for hour, event, maps in EVENT_SCHEDULE:
         if hour == next_hour:
@@ -163,17 +178,18 @@ router = Router()
 async def start_handler(message: Message):
     kb = InlineKeyboardBuilder()
     kb.button(text="📅 Все события", callback_data="events")
+    kb.button(text="🆕 Обновления игры", callback_data="updates")
     kb.button(text="📺 Мой стрим", url=STREAM_URL)
     kb.button(text="📢 Мой канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: текущие и предстоящие события", reply_markup=kb.as_markup())
+    await message.answer("🎮 ARC Raiders: события и новости", reply_markup=kb.as_markup())
 
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
     active, upcoming = get_current_events()
-    parts = ["🎮 <b>ARC Raiders: События</b> (время в UTC)\n"]
+    parts = ["🎮 <b>ARC Raiders: События</b> (время в UTC+3)\n"]
 
     if active:
         parts.append("🟢 <b>Активные:</b>")
@@ -190,12 +206,12 @@ async def events_handler(callback: CallbackQuery):
 
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="events")
+    kb.button(text="🆕 Обновления", callback_data="updates")
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
 
-    # Обход ошибки "message is not modified"
     current_text = callback.message.text or ""
     current_markup = callback.message.reply_markup
     new_markup = kb.as_markup()
@@ -208,11 +224,28 @@ async def events_handler(callback: CallbackQuery):
         await callback.answer("Данные не изменились.")
 
 
+@router.callback_query(lambda c: c.data == "updates")
+async def updates_handler(callback: CallbackQuery):
+    await callback.answer()
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="updates")
+    kb.button(text="📅 Все события", callback_data="events")
+    kb.button(text="⬅️ Назад", callback_data="start")
+    kb.adjust(2)
+    await callback.message.edit_text(GAME_UPDATES, parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+@router.callback_query(lambda c: c.data == "start")
+async def back_to_start(callback: CallbackQuery):
+    await start_handler(callback.message)
+
+
 dp.include_router(router)
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
+    print("✅ ARC Raiders Telegram-бот запущен!")
     await dp.start_polling(bot)
 
 
