@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 # === НАСТРОЙКИ ===
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -46,70 +46,71 @@ def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
 
-# === ТОЧНОЕ РАСПИСАНИЕ (UTC) ИЗ metaforge.app ===
+# === ТОЧНОЕ РАСПИСАНИЕ (UTC) ИЗ ОФИЦИАЛЬНОГО ИСТОЧНИКА ===
 EVENT_SCHEDULE = [
-    # (час_UTC, событие, [карты])
+    # 9:00–10:00 UTC
     (9, "Harvester", ["Dam"]),
     (9, "Lush Blooms", ["Blue Gate"]),
     (9, "Night Raid", ["Buried City"]),
     (9, "Prospecting Probes", ["Spaceport"]),
 
+    # 10:00–11:00 UTC
     (10, "Hidden Bunker", ["Spaceport"]),
     (10, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
     (10, "Night Raid", ["Blue Gate"]),
     (10, "Prospecting Probes", ["Buried City"]),
 
+    # 11:00–12:00 UTC
     (11, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
     (11, "Matriarch", ["Blue Gate"]),
 
+    # 12:00–13:00 UTC
     (12, "Harvester", ["Spaceport"]),
+
+    # 13:00–14:00 UTC
     (13, "Matriarch", ["Dam"]),
+
+    # 14:00–15:00 UTC
     (14, "Night Raid", ["Spaceport"]),
+
+    # 15:00–16:00 UTC
     (15, "Lush Blooms", ["Spaceport"]),
+
+    # 16:00–17:00 UTC
     (16, "Uncovered Caches", ["Dam"]),
     (16, "Husk Graveyard", ["Blue Gate"]),
+
+    # 17:00–18:00 UTC
     (17, "Electromagnetic Storm", ["Dam"]),
     (17, "Hidden Bunker", ["Blue Gate"]),
+
+    # 18:00–19:00 UTC
     (18, "Night Raid", ["Blue Gate"]),
     (18, "Prospecting Probes", ["Spaceport"]),
+
+    # 19:00–20:00 UTC
     (19, "Harvester", ["Blue Gate"]),
     (19, "Matriarch", ["Blue Gate"]),
 
+    # 20:00–21:00 UTC
     (20, "Lush Blooms", ["Blue Gate"]),
     (20, "Matriarch", ["Dam"]),
     (20, "Night Raid", ["Dam", "Stella Montis"]),
     (20, "Uncovered Caches", ["Buried City"]),
 
+    # 21:00–22:00 UTC
     (21, "Matriarch", ["Spaceport"]),
     (21, "Night Raid", ["Buried City"]),
 
+    # 22:00–23:00 UTC
     (22, "Electromagnetic Storm", ["Blue Gate", "Dam", "Spaceport"]),
 
+    # 23:00–00:00 UTC
     (23, "Prospecting Probes", ["Buried City", "Dam", "Blue Gate", "Spaceport"]),
 ]
 
-# === ОБНОВЛЕНИЯ ИГРЫ ===
-GAME_UPDATES = """
-🎮 <b>ARC Raiders — Последние обновления</b>
 
-🔖 <b>v1.2.5 (05.12.2025)</b>
-• Исправлен баг с исчезающими ящиками в Плотине
-• Уменьшен урон Жнеца на 15%
-• Добавлена новая карта: Стелла Монтиc
-• Оптимизация FPS на слабых ПК
-
-🔖 <b>v1.2.4 (28.11.2025)</b>
-• Исправлен вылет при входе в подземелья
-• Снижена длительность Ночного Налёта
-• Исправлено отображение событий в UTC
-
-🔗 <b>Официальные ресурсы</b>
-• Сайт: https://arcreaiders.com  
-• Discord: https://discord.gg/arc-raiders
-"""
-
-
-# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ПО РАСПИСАНИЮ ===
+# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
 def get_current_events():
     now = datetime.now(timezone.utc)
     current_hour = now.hour
@@ -132,7 +133,7 @@ def get_current_events():
                     'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
                 })
 
-    # Предстоящие события (следующий час)
+    # Предстоящие события (в следующем часу)
     next_hour = (current_hour + 1) % 24
     for hour, event, maps in EVENT_SCHEDULE:
         if hour == next_hour:
@@ -158,12 +159,11 @@ router = Router()
 async def start_handler(message: Message):
     kb = InlineKeyboardBuilder()
     kb.button(text="📅 Все события", callback_data="events")
-    kb.button(text="🆕 Обновления игры", callback_data="updates")
     kb.button(text="📺 Мой стрим", url=STREAM_URL)
     kb.button(text="📢 Мой канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: события и новости", reply_markup=kb.as_markup())
+    await message.answer("🎮 ARC Raiders: текущие и предстоящие события", reply_markup=kb.as_markup())
 
 
 @router.callback_query(lambda c: c.data == "events")
@@ -186,7 +186,6 @@ async def events_handler(callback: CallbackQuery):
 
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="events")
-    kb.button(text="🆕 Обновления", callback_data="updates")
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
@@ -205,28 +204,11 @@ async def events_handler(callback: CallbackQuery):
         await callback.answer("Данные не изменились.")
 
 
-@router.callback_query(lambda c: c.data == "updates")
-async def updates_handler(callback: CallbackQuery):
-    await callback.answer()
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🔄 Обновить", callback_data="updates")
-    kb.button(text="📅 Все события", callback_data="events")
-    kb.button(text="⬅️ Назад", callback_data="start")
-    kb.adjust(2)
-    await callback.message.edit_text(GAME_UPDATES, parse_mode="HTML", reply_markup=kb.as_markup())
-
-
-@router.callback_query(lambda c: c.data == "start")
-async def back_to_start(callback: CallbackQuery):
-    await start_handler(callback.message)
-
-
 dp.include_router(router)
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен!")
     await dp.start_polling(bot)
 
 
