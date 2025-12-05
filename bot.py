@@ -214,12 +214,12 @@ router = Router()
 async def start_handler(message: Message):
     kb = InlineKeyboardBuilder()
     kb.button(text="📅 События", callback_data="events")
-    kb.button(text="🆕 Обновления игры", callback_data="updates")  # ← НОВАЯ КНОПКА
-    kb.button(text="📺 Стрим", url=STREAM_URL)
-    kb.button(text="📢 Канал", url=CHANNEL_URL)
+    kb.button(text="🆕 Обновления игры", callback_data="updates")
+    kb.button(text="📺 Мой стрим", url=STREAM_URL)
+    kb.button(text="📢 Мой канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
-    kb.adjust(2)  # 2 кнопки в строке
-    await message.answer("🎮 ARC Raiders: Событие на картах", reply_markup=kb.as_markup())
+    kb.adjust(2)
+    await message.answer("🎮 ARC Raiders: события (по расписанию из Excel)", reply_markup=kb.as_markup())
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
@@ -238,17 +238,17 @@ async def events_handler(callback: CallbackQuery):
             parts.append("\n⏳ <b>Скоро:</b>")
             for e in upcoming[:30]:
                 parts.append(f" • <b>{tr_event(e['name'])}</b> ({tr_map(e['location'])}) — {e['info']} {e['time']}")
-
         msg = "\n".join(parts)
         if len(msg) > 4000:
             msg = msg[:3990] + "\n\n... (список усечён)"
 
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="events")
-    kb.button(text="🆕 Обновления", callback_data="updates")  # ← КНОПКА ВНУТРИ
+    kb.button(text="🆕 Обновления", callback_data="updates")
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
+    kb.button(text="⬅️ Назад", callback_data="start")
     kb.adjust(2)
 
     current_text = callback.message.text or ""
@@ -262,25 +262,36 @@ async def events_handler(callback: CallbackQuery):
     else:
         await callback.answer("Данные не изменились.")
 
-# === ОБНОВЛЕНИЯ ИГРЫ ===
 @router.callback_query(lambda c: c.data == "updates")
 async def updates_handler(callback: CallbackQuery):
     await callback.answer()
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="updates")
-    kb.button(text="📅 События", callback_data="events")
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
+    kb.button(text="⬅️ Назад", callback_data="start")
     kb.adjust(2)
 
     await callback.message.edit_text(GAME_UPDATES, parse_mode="HTML", reply_markup=kb.as_markup())
+
+@router.callback_query(lambda c: c.data == "start")
+async def back_to_menu(callback: CallbackQuery):
+    await callback.answer()
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📅 События", callback_data="events")
+    kb.button(text="🆕 Обновления игры", callback_data="updates")
+    kb.button(text="📺 Мой стрим", url=STREAM_URL)
+    kb.button(text="📢 Мой канал", url=CHANNEL_URL)
+    kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
+    kb.adjust(2)
+    await callback.message.edit_text("🎮 ARC Raiders: события (по расписанию из Excel)", reply_markup=kb.as_markup())
 
 dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (с обновлениями игры)")
+    print("✅ ARC Raiders Telegram-бот запущен (с кнопкой 'Назад')")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
