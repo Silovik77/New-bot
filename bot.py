@@ -40,90 +40,21 @@ MAPS_RU = {
 def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
-# === ТОЧНОЕ РАСПИСАНИЕ (из HTML-файла) ===
-SCHEDULE = [
-    # (час_начала, событие, карта)
-    # 9:00–10:00 UTC
-    (9, "Launch Tower Loot", "Spaceport"),
-    (9, "Lush Blooms", "Blue Gate"),
-    (9, "Matriarch", "Dam"),
-    (9, "Night Raid", "Dam"),
-    (9, "Night Raid", "Stella Montis"),
-    (9, "Uncovered Caches", "Buried City"),
+# === ИМПОРТ РАСПИСАНИЯ ===
+from schedule import SCHEDULE
 
-    # 10:00–11:00 UTC
-    (10, "Husk Graveyard", "Dam"),
-    (10, "Husk Graveyard", "Buried City"),
-    (10, "Husk Graveyard", "Blue Gate"),
-    (10, "Night Raid", "Blue Gate"),
-    (10, "Prospecting Probes", "Buried City"),
-
-    # 11:00–12:00 UTC
-    (11, "Electromagnetic Storm", "Dam"),
-    (11, "Electromagnetic Storm", "Spaceport"),
-    (11, "Electromagnetic Storm", "Blue Gate"),
-    (11, "Matriarch", "Blue Gate"),
-
-    # 12:00–13:00 UTC
-    (12, "Harvester", "Spaceport"),
-
-    # 13:00–14:00 UTC
-    (13, "Matriarch", "Dam"),
-
-    # 14:00–15:00 UTC
-    (14, "Night Raid", "Spaceport"),
-
-    # 15:00–16:00 UTC
-    (15, "Lush Blooms", "Spaceport"),
-
-    # 16:00–17:00 UTC
-    (16, "Uncovered Caches", "Dam"),
-    (16, "Husk Graveyard", "Blue Gate"),
-
-    # 17:00–18:00 UTC
-    (17, "Electromagnetic Storm", "Dam"),
-    # (17, "Hidden Bunker", "Blue Gate"),  # ← ИСКЛЮЧЁН
-
-    # 18:00–19:00 UTC
-    (18, "Night Raid", "Blue Gate"),
-    (18, "Prospecting Probes", "Spaceport"),
-
-    # 19:00–20:00 UTC
-    (19, "Harvester", "Blue Gate"),
-    (19, "Matriarch", "Blue Gate"),
-
-    # 20:00–21:00 UTC
-    (20, "Lush Blooms", "Blue Gate"),
-    (20, "Matriarch", "Dam"),
-    (20, "Night Raid", "Dam"),
-    (20, "Night Raid", "Stella Montis"),
-    (20, "Uncovered Caches", "Buried City"),
-
-    # 21:00–22:00 UTC
-    (21, "Matriarch", "Spaceport"),
-    (21, "Night Raid", "Buried City"),
-
-    # 22:00–23:00 UTC
-    (22, "Electromagnetic Storm", "Blue Gate"),
-    (22, "Electromagnetic Storm", "Dam"),
-    (22, "Electromagnetic Storm", "Spaceport"),
-
-    # 23:00–00:00 UTC
-    (23, "Prospecting Probes", "Buried City"),
-    (23, "Prospecting Probes", "Dam"),
-    (23, "Prospecting Probes", "Blue Gate"),
-    (23, "Prospecting Probes", "Spaceport"),
-]
-
+# === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
 def get_current_events():
     now = datetime.now(timezone.utc)
     current_hour = now.hour
-    total_sec = now.minute * 60 + now.second
+    minutes = now.minute
+    seconds = now.second
+    total_sec = minutes * 60 + seconds
 
     active = []
     upcoming = []
 
-    # === АКТИВНЫЕ СОБЫТИЯ ===
+    # === АКТИВНЫЕ СОБЫТИЯ (в этом часу) ===
     for hour, event, loc in SCHEDULE:
         if hour == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
@@ -134,7 +65,7 @@ def get_current_events():
                 'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
             })
 
-    # === ПРЕДСТОЯЩИЕ СОБЫТИЯ ===
+    # === ПРЕДСТОЯЩИЕ СОБЫТИЯ (в следующем часу) ===
     next_hour = (current_hour + 1) % 24
     for hour, event, loc in SCHEDULE:
         if hour == next_hour:
@@ -161,7 +92,7 @@ async def start_handler(message: Message):
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: события по картам", reply_markup=kb.as_markup())
+    await message.answer("🎮 ARC Raiders: события по расписанию", reply_markup=kb.as_markup())
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
@@ -202,7 +133,7 @@ dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (по точному расписанию)")
+    print("✅ ARC Raiders Telegram-бот запущен (по расписанию из Excel)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
