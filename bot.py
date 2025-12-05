@@ -219,7 +219,7 @@ async def start_handler(message: Message):
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)  # 2 кнопки в строке
-    await message.answer("🎮 ARC Raiders: события (по расписанию из hub.arcraiders.com)", reply_markup=kb.as_markup())
+    await message.answer("🎮 ARC Raiders: Событие на картах", reply_markup=kb.as_markup())
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
