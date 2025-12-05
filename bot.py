@@ -47,35 +47,30 @@ def tr_map(name): return MAPS_RU.get(name, name)
 
 # === ТОЧНОЕ РАСПИСАНИЕ (UTC) ИЗ САЙТА ===
 EVENT_SCHEDULE = [
-    # 8:00–9:00 UTC
+    # 8:00–9:00 UTC — АКТИВНЫЕ СЕЙЧАС
+    (8, "Harvester", ["Dam"]),
     (8, "Lush Blooms", ["Blue Gate"]),
-    (8, "Matriarch", ["Dam"]),
-    (8, "Night Raid", ["Dam", "Stella Montis"]),
-    (8, "Uncovered Caches", ["Buried City"]),
+    (8, "Night Raid", ["Buried City"]),
+    (8, "Prospecting Probes", ["Spaceport"]),
 
-    # 9:00–10:00 UTC
-    (9, "Harvester", ["Dam"]),
-    (9, "Lush Blooms", ["Blue Gate"]),
-    (9, "Night Raid", ["Buried City"]),
-    (9, "Prospecting Probes", ["Spaceport"]),
+    # 9:00–10:00 UTC — ПРЕДСТОЯЩИЕ
+    (9, "Hidden Bunker", ["Spaceport"]),
+    (9, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
+    (9, "Night Raid", ["Blue Gate"]),
+    (9, "Prospecting Probes", ["Buried City"]),
 
     # 10:00–11:00 UTC
-    (10, "Husk Graveyard", ["Dam", "Buried City", "Blue Gate"]),
-    (10, "Night Raid", ["Blue Gate"]),
-    (10, "Prospecting Probes", ["Buried City"]),
+    (10, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
+    (10, "Matriarch", ["Blue Gate"]),
 
     # 11:00–12:00 UTC
-    (11, "Electromagnetic Storm", ["Dam", "Spaceport", "Blue Gate"]),
-    (11, "Matriarch", ["Blue Gate"]),
-
-    # 12:00–13:00 UTC
-    (12, "Harvester", ["Spaceport"]),
-    (13, "Matriarch", ["Dam"]),
-    (14, "Night Raid", ["Spaceport"]),
-    (15, "Lush Blooms", ["Spaceport"]),
-    (16, "Uncovered Caches", ["Dam"]),
-    (16, "Husk Graveyard", ["Blue Gate"]),
-    (17, "Electromagnetic Storm", ["Dam"]),
+    (11, "Harvester", ["Spaceport"]),
+    (12, "Matriarch", ["Dam"]),
+    (13, "Night Raid", ["Spaceport"]),
+    (14, "Lush Blooms", ["Spaceport"]),
+    (15, "Uncovered Caches", ["Dam"]),
+    (15, "Husk Graveyard", ["Blue Gate"]),
+    (16, "Electromagnetic Storm", ["Dam"]),
     # (17, "Hidden Bunker", ["Blue Gate"]),  # ← ВРЕМЕННО УДАЛЁН
     (18, "Night Raid", ["Blue Gate"]),
     (18, "Prospecting Probes", ["Spaceport"]),
