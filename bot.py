@@ -136,13 +136,11 @@ SCHEDULE = [
 
     # 20:00–21:00
     (20, "Harvester", "Blue Gate"),
-    (20, "Lush Blooms", "Dam")
+    (20, "Lush Blooms", "Dam"),
     (20, "Lush Blooms", "Buried City"),
     (20, "Electromagnetic Storm", "Dam"),
-    (20,"Night Raid", "Stella Montis")
-
-    # 21:00–22:00
-    (21, "Night Raid", "Buried City"),
+    (20, "Night Raid", "Stella Montis")
+    ,
     (21, "Husk Graveyard", "Blue Gate"),
     (21, "Harvester", "Spaceport"),
 
