@@ -1,21 +1,24 @@
 import asyncio
 import logging
 import os
+import re
+import requests
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from datetime import datetime, timezone, timedelta
 
 # === НАСТРОЙКИ ===
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
+# === ВАШИ ССЫЛКИ ===
 STREAM_URL = "https://www.twitch.tv/silovik_"
 CHANNEL_URL = "https://t.me/silovik_stream"
 SUPPORT_URL = "https://dalink.to/silovik_"
 
+# === ПЕРЕВОДЫ ===
 EVENTS_RU = {
     "Lush Blooms": "Пышное Цветение",
     "Matriarch": "Матриарх",
@@ -43,44 +46,63 @@ def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
 
-# === ФУНКЦИЯ: ВЫЧИСЛЕНИЕ СОБЫТИЙ НА ОСНОВЕ ТЕКУЩЕГО ВРЕМЕНИ (UTC) ===
-def get_current_events():
-    now = datetime.now(timezone.utc)
-    current_hour = now.hour
-    minutes = now.minute
-    seconds = now.second
-    total_sec = minutes * 60 + seconds
+# === ПОЛУЧЕНИЕ СОБЫТИЙ ИЗ САЙТА (ТОЛЬКО Active now + Upcoming next) ===
+def get_events_from_site():
+    headers = {"User-Agent": "Mozilla/5.0"}
+    resp = requests.get("https://metaforge.app/arc-raiders/event-timers", headers=headers, timeout=10)
+    resp.raise_for_status()
+    html = resp.text
 
     active = []
     upcoming = []
 
-    # === АКТИВНЫЕ СОБЫТИЯ (8:00–9:00 UTC) ===
-    if current_hour == 8 and total_sec < 3600:
-        time_left = 3600 - total_sec
-        mins, secs = divmod(time_left, 60)
-        active.extend([
-            {"name": "Lush Blooms", "location": "Blue Gate", "info": f"Заканчивается через {mins}m {secs}s"},
-            {"name": "Matriarch", "location": "Dam", "info": f"Заканчивается через {mins}m {secs}s"},
-            {"name": "Night Raid", "location": "Dam", "info": f"Заканчивается через {mins}m {secs}s"},
-            {"name": "Night Raid", "location": "Stella Montis", "info": f"Заканчивается через {mins}m {secs}s"},
-            {"name": "Uncovered Caches", "location": "Buried City", "info": f"Заканчивается через {mins}m {secs}s"},
-        ])
+    # --- Парсинг Active now ---
+    active_match = re.search(r'Active now\s*(.*?)\s*Upcoming next', html, re.DOTALL)
+    if active_match:
+        block = active_match.group(1)
+        for line in block.splitlines():
+            if "Ends in" in line:
+                parts = line.split(" Ends in ", 1)
+                if len(parts) == 2:
+                    name_loc = parts[0].strip()
+                    time_left = parts[1].strip()
+                    # Пропускаем "Hidden Bunker"
+                    if "Hidden Bunker" in name_loc:
+                        continue
+                    for ev in EVENTS_RU:
+                        if name_loc.startswith(ev):
+                            loc = name_loc[len(ev):].strip()
+                            if loc:
+                                active.append({
+                                    'name': ev,
+                                    'location': loc,
+                                    'info': f"Заканчивается через {time_left}"
+                                })
+                            break
 
-    # === ПРЕДСТОЯЩИЕ СОБЫТИЯ (9:00–10:00 UTC) ===
-    if current_hour == 9 and total_sec < 3600:
-        time_left = 3600 - total_sec
-        mins, secs = divmod(time_left, 60)
-        upcoming.extend([
-            {"name": "Matriarch", "location": "Spaceport", "info": f"Заканчивается через {mins}m {secs}s"},
-            {"name": "Night Raid", "location": "Buried City", "info": f"Заканчивается через {mins}m {secs}s"},
-        ])
-    elif current_hour == 8:  # если сейчас 8:xx, то следующие события — в 9:00
-        time_until = 3600 - total_sec
-        mins, secs = divmod(time_until, 60)
-        upcoming.extend([
-            {"name": "Matriarch", "location": "Spaceport", "info": f"Начнётся через {mins}m {secs}s"},
-            {"name": "Night Raid", "location": "Buried City", "info": f"Начнётся через {mins}m {secs}s"},
-        ])
+    # --- Парсинг Upcoming next ---
+    upcoming_match = re.search(r'Upcoming next\s*(.*?)(?:####|\Z)', html, re.DOTALL)
+    if upcoming_match:
+        block = upcoming_match.group(1)
+        for line in block.splitlines():
+            if "Starts in" in line:
+                parts = line.split(" Starts in ", 1)
+                if len(parts) == 2:
+                    name_loc = parts[0].strip()
+                    time_left = parts[1].strip()
+                    # Пропускаем "Hidden Bunker"
+                    if "Hidden Bunker" in name_loc:
+                        continue
+                    for ev in EVENTS_RU:
+                        if name_loc.startswith(ev):
+                            loc = name_loc[len(ev):].strip()
+                            if loc:
+                                upcoming.append({
+                                    'name': ev,
+                                    'location': loc,
+                                    'info': f"Начнётся через {time_left}"
+                                })
+                            break
 
     return active, upcoming
 
@@ -104,7 +126,12 @@ async def start_handler(message: Message):
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
-    active, upcoming = get_current_events()
+    try:
+        active, upcoming = get_events_from_site()
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Ошибка загрузки: {e}")
+        return
+
     parts = ["🎮 <b>ARC Raiders: События</b> (время в UTC)\n"]
 
     if active:
