@@ -40,51 +40,38 @@ MAPS_RU = {
 def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
-# === ПОЛНОЕ РАСПИСАНИЕ ИЗ EXCEL (время в Москве — UTC+3) ===
+# === РАСПИСАНИЕ ИЗ EXCEL (время в Москве — UTC+3) ===
 SCHEDULE = [
     # (час_начала_мск, событие, карта)
-    # 9:00–10:00
     (9, "Launch Tower Loot", "Spaceport"),
     (9, "Night Raid", "Dam"),
 
-    # 15:00–16:00
     (15, "Lush Blooms", "Spaceport"),
     (15, "Night Raid", "Buried City"),
 
-    # 16:00–17:00
     (16, "Uncovered Caches", "Dam"),
     (16, "Prospecting Probes", "Buried City"),
 
-    # 17:00–18:00
     (17, "Husk Graveyard", "Buried City"),
     (17, "Electromagnetic Storm", "Dam"),
-    (17, "Uncovered Caches", "Blue Gate"),
 
-    # 18:00–19:00
     (18, "Night Raid", "Blue Gate"),
-    (18, "Uncovered Caches", "Spaceport"),
 
-    # 19:00–20:00
     (19, "Harvester", "Dam"),
     (19, "Electromagnetic Storm", "Spaceport"),
 
-    # 20:00–21:00
     (20, "Matriarch", "Blue Gate"),
     (20, "Night Raid", "Dam"),
-    (20, "Lush Blooms", "Buried City"),
 
-    # 21:00–22:00
     (21, "Prospecting Probes", "Buried City"),
-    (21, "Husk Graveyard", "Blue Gate"),
 
-    # 22:00–23:00
-    (22, "Electromagnetic Storm", "Spaceport"),
+    (22, "Husk Graveyard", "Blue Gate"),
 
-    # 23:00–0:00
     (23, "Prospecting Probes", "Dam"),
     (23, "Prospecting Probes", "Blue Gate"),
     (23, "Prospecting Probes", "Spaceport"),
 
+    # Добавим и другие часы из Excel (если есть)
     # 0:00–1:00
     (0, "Matriarch", "Spaceport"),
 
@@ -108,7 +95,6 @@ SCHEDULE = [
     # 6:00–7:00
     (6, "Launch Tower Loot", "Spaceport"),
     (6, "Matriarch", "Dam"),
-    (6, "Electromagnetic Storm", "Spaceport"),
 
     # 7:00–8:00
     (7, "Night Raid", "Buried City"),
@@ -136,9 +122,6 @@ SCHEDULE = [
 
     # 14:00–15:00
     (14, "Uncovered Caches", "Dam"),
-
-    # 24 часа: продолжение цикла
-    # (и так далее — если в Excel есть больше данных)
 ]
 
 def get_current_events():
@@ -193,7 +176,7 @@ async def start_handler(message: Message):
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: события (по расписанию из Excel)", reply_markup=kb.as_markup())
+    await message.answer("🎮 ARC Raiders: события (по времени из Excel)", reply_markup=kb.as_markup())
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
@@ -201,7 +184,7 @@ async def events_handler(callback: CallbackQuery):
     active, upcoming = get_current_events()
 
     if not active and not upcoming:
-        msg = " agosto Нет событий."
+        msg = " august Нет событий."
     else:
         parts = ["🎮 <b>ARC Raiders: События</b> (время в Москве, UTC+3)\n"]
         if active:
@@ -239,7 +222,7 @@ dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (по Excel-расписанию)")
+    print("✅ ARC Raiders Telegram-бот запущен (по расписанию из Excel, Moscow Time)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
