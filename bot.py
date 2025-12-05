@@ -40,47 +40,79 @@ MAPS_RU = {
 def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
-# === РАСПИСАНИЕ СОБЫТИЙ (в UTC, каждый день повторяется) ===
+# === ТОЧНОЕ РАСПИСАНИЕ (из HTML-файла) ===
 SCHEDULE = [
     # (час_начала, событие, карта)
-    (20, "Harvester", "Dam"),
+    # 9:00–10:00 UTC
+    (9, "Launch Tower Loot", "Spaceport"),
+    (9, "Lush Blooms", "Blue Gate"),
+    (9, "Matriarch", "Dam"),
+    (9, "Night Raid", "Dam"),
+    (9, "Night Raid", "Stella Montis"),
+    (9, "Uncovered Caches", "Buried City"),
+
+    # 10:00–11:00 UTC
+    (10, "Husk Graveyard", "Dam"),
+    (10, "Husk Graveyard", "Buried City"),
+    (10, "Husk Graveyard", "Blue Gate"),
+    (10, "Night Raid", "Blue Gate"),
+    (10, "Prospecting Probes", "Buried City"),
+
+    # 11:00–12:00 UTC
+    (11, "Electromagnetic Storm", "Dam"),
+    (11, "Electromagnetic Storm", "Spaceport"),
+    (11, "Electromagnetic Storm", "Blue Gate"),
+    (11, "Matriarch", "Blue Gate"),
+
+    # 12:00–13:00 UTC
+    (12, "Harvester", "Spaceport"),
+
+    # 13:00–14:00 UTC
+    (13, "Matriarch", "Dam"),
+
+    # 14:00–15:00 UTC
+    (14, "Night Raid", "Spaceport"),
+
+    # 15:00–16:00 UTC
+    (15, "Lush Blooms", "Spaceport"),
+
+    # 16:00–17:00 UTC
+    (16, "Uncovered Caches", "Dam"),
+    (16, "Husk Graveyard", "Blue Gate"),
+
+    # 17:00–18:00 UTC
+    (17, "Electromagnetic Storm", "Dam"),
+    # (17, "Hidden Bunker", "Blue Gate"),  # ← ИСКЛЮЧЁН
+
+    # 18:00–19:00 UTC
+    (18, "Night Raid", "Blue Gate"),
+    (18, "Prospecting Probes", "Spaceport"),
+
+    # 19:00–20:00 UTC
+    (19, "Harvester", "Blue Gate"),
+    (19, "Matriarch", "Blue Gate"),
+
+    # 20:00–21:00 UTC
     (20, "Lush Blooms", "Blue Gate"),
-    (20, "Night Raid", "Buried City"),
-    (20, "Prospecting Probes", "Spaceport"),
+    (20, "Matriarch", "Dam"),
+    (20, "Night Raid", "Dam"),
+    (20, "Night Raid", "Stella Montis"),
+    (20, "Uncovered Caches", "Buried City"),
 
-    (21, "Husk Graveyard", "Dam"),
-    (21, "Night Raid", "Blue Gate"),
-    (21, "Prospecting Probes", "Buried City"),
+    # 21:00–22:00 UTC
+    (21, "Matriarch", "Spaceport"),
+    (21, "Night Raid", "Buried City"),
 
+    # 22:00–23:00 UTC
     (22, "Electromagnetic Storm", "Blue Gate"),
     (22, "Electromagnetic Storm", "Dam"),
     (22, "Electromagnetic Storm", "Spaceport"),
 
+    # 23:00–00:00 UTC
     (23, "Prospecting Probes", "Buried City"),
     (23, "Prospecting Probes", "Dam"),
     (23, "Prospecting Probes", "Blue Gate"),
     (23, "Prospecting Probes", "Spaceport"),
-
-    (0, "Harvester", "Spaceport"),
-    (1, "Launch Tower Loot", "Spaceport"),
-    # (2, "Hidden Bunker", "Spaceport"),  # ← ИСКЛЮЧЁН
-    (3, "Husk Graveyard", "Blue Gate"),
-    (4, "Night Raid", "Spaceport"),
-    (5, "Lush Blooms", "Buried City"),
-    (6, "Matriarch", "Blue Gate"),
-    # (7, "Hidden Bunker", "Blue Gate"),  # ← ИСКЛЮЧЁН
-    (8, "Night Raid", "Buried City"),
-    (9, "Electromagnetic Storm", "Dam"),
-    (10, "Harvester", "Blue Gate"),
-    (11, "Matriarch", "Spaceport"),
-    (12, "Launch Tower Loot", "Spaceport"),
-    (13, "Husk Graveyard", "Dam"),
-    (14, "Night Raid", "Blue Gate"),
-    (15, "Prospecting Probes", "Spaceport"),
-    (16, "Matriarch", "Dam"),
-    (17, "Electromagnetic Storm", "Spaceport"),
-    (18, "Harvester", "Dam"),
-    (19, "Lush Blooms", "Spaceport"),
 ]
 
 def get_current_events():
@@ -170,7 +202,7 @@ dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (статичный таймер, без Hidden Bunker)")
+    print("✅ ARC Raiders Telegram-бот запущен (по точному расписанию)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
