@@ -47,7 +47,7 @@ SCHEDULE = [
 
 
 
-    (0, "Matriarch", "Dam"),
+    (0, "Night Raid", "Buried City"),
     (0, "Matriarch", "Spaceport"),
 
     (1, "Electromagnetic Storm", "Blue Gate"),
