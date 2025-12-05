@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from schedule import SCHEDULE
 
 # === НАСТРОЙКИ ===
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -40,8 +41,7 @@ MAPS_RU = {
 def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
-# === ИМПОРТ РАСПИСАНИЯ ===
-from schedule import SCHEDULE
+
 
 # === ВЫЧИСЛЕНИЕ СОБЫТИЙ ===
 def get_current_events():
