@@ -58,6 +58,7 @@ SCHEDULE = [
     (2,  "Buried City", "Dam"),
     (2, "Night Raid", "Stella Montis"),
     (2, "Electromagnetic Storm", "Dam"),
+    (2, "Matriarch", "Blue Gate"),
 
     (3, "Matriarch", "Dam"),
     (3, "Night Raid", "Buried City"),
