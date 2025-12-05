@@ -42,28 +42,89 @@ def tr_map(name): return MAPS_RU.get(name, name)
 
 # === ПОЛНОЕ РАСПИСАНИЕ (из Excel + HTML) ===
 SCHEDULE = [
-    # (час_начала_мск, событие, карта)
+    # 0:00–1:00
+    (0, "Matriarch", "Spaceport"),
+
+    # 1:00–2:00
+    (1, "Husk Graveyard", "Blue Gate"),
+
+    # 2:00–3:00
+    (2, "Prospecting Probes", "Buried City"),
+    (2, "Prospecting Probes", "Blue Gate"),
+    (2, "Prospecting Probes", "Dam"),
+
+    # 3:00–4:00
+    (3, "Electromagnetic Storm", "Spaceport"),
+    (3, "Electromagnetic Storm", "Dam"),
+
+    # 5:00–6:00
+    (5, "Lush Blooms", "Buried City"),
+    (5, "Husk Graveyard", "Blue Gate"),
+
+    # 6:00–7:00
+    (6, "Launch Tower Loot", "Spaceport"),
+    (6, "Matriarch", "Dam"),
+
+    # 8:00–9:00
+    (8, "Husk Graveyard", "Buried City"),
+    (8, "Night Raid", "Blue Gate"),
+
+    # 9:00–10:00
     (9, "Launch Tower Loot", "Spaceport"),
-    (9, "Launch Tower Loot", "Spaceport"),
+    (9, "Night Raid", "Dam"),
+
+    # 10:00–11:00
+    (10, "Husk Graveyard", "Dam"),
+    (10, "Night Raid", "Blue Gate"),
+    (10, "Prospecting Probes", "Buried City"),
+
+    # 11:00–12:00
+    (11, "Electromagnetic Storm", "Blue Gate"),
+    (11, "Matriarch", "Spaceport"),
+
+    # 12:00–13:00
+    (12, "Launch Tower Loot", "Spaceport"),
+
+    # 13:00–14:00
+    (13, "Uncovered Caches", "Dam"),
+
+    # 15:00–16:00
     (15, "Lush Blooms", "Spaceport"),
     (15, "Night Raid", "Buried City"),
-    (16, "Night Raid", "Dam"),
-    (16, "Prospecting Probes", "Dam"),
+
+    # 16:00–17:00
+    (16, "Uncovered Caches", "Dam"),
+    (16, "Prospecting Probes", "Buried City"),
+
+    # 17:00–18:00
     (17, "Husk Graveyard", "Buried City"),
+    (17, "Electromagnetic Storm", "Dam"),
     (17, "Uncovered Caches", "Blue Gate"),
+
+    # 18:00–19:00
+    (18, "Night Raid", "Blue Gate"),
     (18, "Uncovered Caches", "Spaceport"),
-    (19, "Electromagnetic Storm", "Spaceport"),
-    (19, "Electromagnetic Storm", "Blue Gate"),
+
+    # 19:00–20:00
     (19, "Harvester", "Dam"),
-    (20, "Harvester", "Blue Gate"),
-    (20, "Lush Blooms", "Buried City"),
+    (19, "Electromagnetic Storm", "Spaceport"),
+
+    # 20:00–21:00
+    (20, "Matriarch", "Blue Gate"),
     (20, "Night Raid", "Dam"),
+    (20, "Lush Blooms", "Buried City"),
+
+    # 21:00–22:00
+    (21, "Prospecting Probes", "Buried City"),
     (21, "Husk Graveyard", "Blue Gate"),
+
+    # 22:00–23:00
+    (22, "Electromagnetic Storm", "Spaceport"),
+
+    # 23:00–0:00
+    (23, "Prospecting Probes", "Dam"),
+    (23, "Prospecting Probes", "Blue Gate"),
     (23, "Matriarch", "Dam"),
-    (0, "Matriarch", "Spaceport"),
-    (2, "Prospecting Probes", "Buried City"),
-    (9, "Prospecting Probes", "Dam"),
-]
 ]
 
 def get_current_events():
