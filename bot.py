@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
@@ -40,72 +40,109 @@ MAPS_RU = {
 def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
-# === РАСПИСАНИЕ ИЗ ARCRAIDERSHUB.COM (время в Москве, UTC+3) ===
-EVENT_TIMERS = [
+# === РАСПИСАНИЕ (время в Москве — UTC+3) ===
+SCHEDULE = [
     # (час_начала_мск, событие, карта)
-    (4, "Electromagnetic Storm", "Spaceport"),
-    (0, "Harvester", "Spaceport"),
-    (1, "Husk Graveyard", "Blue Gate"),
-    (2, "Night Raid", "Stella Montis"),
+
+
+
+
+    (0, "Matriarch", "Dam"),
+    (0, "Matriarch", "Spaceport"),
+
+    (1, "Electromagnetic Storm", "Blue Gate"),
+    (1,"Night Raid", "Stella Montis"),
+    (1,"Night Raid", "Spaceport"),
+
     (2, "Prospecting Probes", "Buried City"),
+    (2,  "Buried City", "Dam"),
+    (2, "Night Raid", "Stella Montis"),
+    (2, "Electromagnetic Storm", "Dam"),
+
     (3, "Matriarch", "Dam"),
-    (5, "Electromagnetic Storm", "Dam"),
-    (5, "Lush Blooms", "Buried City"),
-    (5, "Matriarch", "Spaceport"),
-    (5, "Night Raid", "Buried City"),
-    (5, "Uncovered Caches", "Dam"),
-    (6, "Night Raid", "Blue Gate"),
-    (6, "Prospecting Probes", "Spaceport"),
-    (6, "Uncovered Caches", "Spaceport"),
-    (7, "Night Raid", "Dam"),
-    (7, "Electromagnetic Storm", "Blue Gate"),
+    (3, "Night Raid", "Buried City"),
+    (3, "Harvester", "Spaceport"),
+
+    (4, "Night Raid", "Spaceport"),
+
+    (5, "Night Raid", "Dam"),
+    (5, "Uncovered Caches", "Buried City"),
+    (5, "Husk Graveyard", "Blue Gate"),
+
+
+    (6, "Lush Blooms", "Dam"),
+    (6, "Night Raid", "Buried City"),
+    (6, "Matriarch", "Spaceport"),
+
+    (7, "Electromagnetic Storm", "Spaceport"),
+    (7, "Night Raid", "Blue Gate"),
+
+    (8, "Electromagnetic Storm", "Dam"),
     (8, "Husk Graveyard", "Buried City"),
-    (8, "Prospecting Probes", "Blue Gate"),
+    (8, "Harvester", "Blue Gate"),
+
     (9, "Launch Tower Loot", "Spaceport"),
-    (9, "Night Raid", "Dam"),
     (9, "Prospecting Probes", "Dam"),
-    (9, "Prospecting Probes", "Spaceport"),
-    (10, "Husk Graveyard", "Dam"),
-    (10, "Night Raid", "Blue Gate"),
-    (10, "Prospecting Probes", "Buried City"),
-    (11, "Electromagnetic Storm", "Blue Gate"),
-    (11, "Electromagnetic Storm", "Dam"),
-    (11, "Electromagnetic Storm", "Spaceport"),
+    (9, "Night Raid", "Buried City"),
+
+    (10, "Electromagnetic Storm", "Blue Gate"),
+    (10, "Night Raid", "Spaceport"),
+
+    (11, "Night Raid", "Dam"),
+    (11, "Lush Blooms", "Buried City"),
     (11, "Prospecting Probes", "Blue Gate"),
-    (12, "Harvester", "Spaceport"),
+
+    (12, "Harvester", "Dam"),
+    (12, "Night Raid", "Buried City"),
     (12, "Prospecting Probes", "Spaceport"),
-    (13, "Lush Blooms", "Spaceport"),
+    (12, "Lush Blooms", "Blue Gate"),
+
     (13, "Husk Graveyard", "Dam"),
-    (14, "Night Raid", "Spaceport"),
-    (14, "Uncovered Caches", "Dam"),
+    (13, "Hidden Bunker", "Spaceport"),
+    (13, "Night Raid", "Blue Gate"),
+
+    (14, "Electromagnetic Storm", "Dam"),
+    (14, "Prospecting Probes", "Buried City"),
+    (14, "Matriarch", "Blue Gate"),
+
     (15, "Lush Blooms", "Spaceport"),
     (15, "Night Raid", "Buried City"),
-    (16, "Uncovered Caches", "Dam"),
-    (16, "Prospecting Probes", "Buried City"),
+
+    (16, "Prospecting Probes", "Dam"),
     (16, "Night Raid", "Spaceport"),
-    (17, "Husk Graveyard", "Buried City"),
-    (17, "Electromagnetic Storm", "Dam"),
-    (17, "Uncovered Caches", "Blue Gate"),
+
     (17, "Night Raid", "Dam"),
-    (17, "Night Raid", "Stella Montis"),
-    (18, "Night Raid", "Blue Gate"),
+    (17, "Husk Graveyard", "Buried City"),
+    (17, "Uncovered Caches", "Blue Gate"),
+
     (18, "Uncovered Caches", "Spaceport"),
-    (18, "Night Raid", "Buried City"),
+
     (19, "Harvester", "Dam"),
     (19, "Electromagnetic Storm", "Spaceport"),
     (19, "Electromagnetic Storm", "Blue Gate"),
-    (20, "Matriarch", "Blue Gate"),
-    (20, "Night Raid", "Dam"),
+
+    (20, "Harvester", "Blue Gate"),
+    (20, "Electromagnetic Storm", "Dam"),
+    (20, "Lush Blooms", "Dam"),
     (20, "Lush Blooms", "Buried City"),
-    (21, "Prospecting Probes", "Buried City"),
-    (21, "Husk Graveyard", "Blue Gate"),
+    (20, "Night Raid", "Stella Montis"),
+
+    (21, "Night Raid", "Buried City"),
     (21, "Harvester", "Spaceport"),
-    (22, "Electromagnetic Storm", "Spaceport"),
+    (21, "Husk Graveyard", "Blue Gate"),
+
+    (22, "Hidden Bunker", "Spaceport"),
+    (22, "Night Raid", "Blue Gate"),
+
+
+    (21, "Prospecting Probes", "Buried City"),
+
     (22, "Husk Graveyard", "Blue Gate"),
-    (23, "Prospecting Probes", "Dam"),
-    (23, "Prospecting Probes", "Blue Gate"),
-    (23, "Prospecting Probes", "Spaceport"),
+
     (23, "Matriarch", "Dam"),
+    (23, "Uncovered Caches", "Buried City"),
+    (23, "Lush Blooms", "Blue Gate"),
+
 ]
 
 def get_current_events():
@@ -121,7 +158,7 @@ def get_current_events():
     upcoming = []
 
     # === АКТИВНЫЕ СОБЫТИЯ (в этом часу по Москве) ===
-    for hour, event, loc in EVENT_TIMERS:
+    for hour, event, loc in SCHEDULE:
         if hour == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
             mins, secs = divmod(time_left, 60)
@@ -134,7 +171,7 @@ def get_current_events():
 
     # === ПРЕДСТОЯЩИЕ СОБЫТИЯ (в следующем часу по Москве) ===
     next_hour = (current_hour + 1) % 24
-    for hour, event, loc in EVENT_TIMERS:
+    for hour, event, loc in SCHEDULE:
         if hour == next_hour:
             time_until = 3600 - total_sec
             mins, secs = divmod(time_until, 60)
@@ -206,7 +243,7 @@ dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (по расписанию из arcraidershub.com)")
+    print("✅ ARC Raiders Telegram-бот запущен (по расписанию из Excel, Moscow Time)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
