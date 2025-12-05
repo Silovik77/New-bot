@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import requests
+import re
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
@@ -40,114 +42,66 @@ MAPS_RU = {
 def tr_event(name): return EVENTS_RU.get(name, name)
 def tr_map(name): return MAPS_RU.get(name, name)
 
-# === РАСПИСАНИЕ ИЗ EXCEL (время в Москве — UTC+3) ===
-SCHEDULE = [
-    # === HUSK GRAVEYARD ===
-    (17, "Husk Graveyard", "Buried City"),
-    (21, "Husk Graveyard", "Blue Gate"),
-    (5, "Husk Graveyard", "Blue Gate"),
-    (8, "Husk Graveyard", "Buried City"),
-    (13, "Husk Graveyard", "Dam"),
+# === ПАРСИНГ С САЙТА ARCRaidersHub ===
+def fetch_events_from_hub():
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; Telegram Bot)"}
+    resp = requests.get("https://arcraidershub.com/events", headers=headers, timeout=10)
+    resp.raise_for_status()
+    html = resp.text
 
-    # === LAUNCH TOWER LOOT ===
-    (9, "Launch Tower Loot", "Spaceport"),  # ← дубль удалён
+    # Извлекаем события из HTML
+    events = []
+    # Пример: <span class="event-name">Harvester</span> <span class="event-map">Dam</span> <span class="event-time">19:00–20:00</span>
+    pattern = r'<span class="event-name">([^<]+)</span>.*?<span class="event-map">([^<]+)</span>.*?<span class="event-time">(\d{2}):\d{2}–(\d{2}):\d{2}</span>'
+    matches = re.findall(pattern, html, re.DOTALL)
 
-    # === LUSH BLOOMS ===
-    (15, "Lush Blooms", "Spaceport"),
-    (20, "Lush Blooms", "Dam"),
-    (20, "Lush Blooms", "Buried City"),
-    (23, "Lush Blooms", "Blue Gate"),
-    (6, "Lush Blooms", "Dam"),
+    for name, loc, start_h, end_h in matches:
+        start_hour = int(start_h)
+        end_hour = int(end_h)
+        # Добавляем каждое событие на каждый час, в который оно идёт
+        for hour in range(start_hour, end_hour):
+            events.append({
+                'name': name.strip(),
+                'location': loc.strip(),
+                'start_hour': hour,
+                'end_hour': (hour + 1) % 24
+            })
 
-    # === MATRIARCH ===
-    (23, "Matriarch", "Dam"),
-    (0, "Matriarch", "Spaceport"),
-    (2, "Matriarch", "Blue Gate"),
-    (3, "Matriarch", "Dam"),
-    (6, "Matriarch", "Spaceport"),
-
-    # === NIGHT RAID ===
-    (15, "Night Raid", "Buried City"),
-    (16, "Night Raid", "Spaceport"),
-    (17, "Night Raid", "Dam"),
-    (17, "Night Raid", "Stella Montis"),
-    (18, "Night Raid", "Buried City"),
-
-    # === PROSPECTING PROBES ===
-    (16, "Prospecting Probes", "Dam"),
-    (2, "Prospecting Probes", "Buried City"),
-    (9, "Prospecting Probes", "Dam"),
-    (11, "Prospecting Probes", "Blue Gate"),
-    (12, "Prospecting Probes", "Spaceport"),
-
-    # === UNCOVERED CACHES ===
-    (17, "Uncovered Caches", "Blue Gate"),
-    (18, "Uncovered Caches", "Spaceport"),
-    (23, "Uncovered Caches", "Buried City"),
-    (2, "Uncovered Caches", "Dam"),
-    (5, "Uncovered Caches", "Buried City"),
-
-    # === ELECTROMAGNETIC STORM ===
-    (19, "Electromagnetic Storm", "Spaceport"),
-    (19, "Electromagnetic Storm", "Blue Gate"),
-    (20, "Electromagnetic Storm", "Dam"),
-
-    # === HARVESTER ===
-    (19, "Harvester", "Dam"),
-    (20, "Harvester", "Blue Gate"),
-    (21, "Harvester", "Spaceport"),
-
-    # === ELECTROMAGNETIC STORM (ещё раз) ===
-    (1, "Electromagnetic Storm", "Blue Gate"),
-    (2, "Electromagnetic Storm", "Dam"),
-    (4, "Electromagnetic Storm", "Spaceport"),
-    (11, "Electromagnetic Storm", "Blue Gate"),
-    (11, "Electromagnetic Storm", "Dam"),
-    (11, "Electromagnetic Storm", "Spaceport"),
-
-    # === NIGHT RAID (ещё раз) ===
-    (20, "Night Raid", "Stella Montis"),
-
-    # === PROSPECTING PROBES (ещё раз) ===
-    (9, "Prospecting Probes", "Spaceport"),
-
-    # === Matriarch (ещё раз) ===
-    (22, "Matriarch", "Spaceport"),
-]
+    return events
 
 def get_current_events():
     # Московское время (UTC+3)
-    moscow_tz = timezone(timedelta(hours=3))
-    now = datetime.now(moscow_tz)
+    now = datetime.now(timezone(timedelta(hours=3)))
     current_hour = now.hour
     minutes = now.minute
     seconds = now.second
     total_sec = minutes * 60 + seconds
 
+    events = fetch_events_from_hub()
     active = []
     upcoming = []
 
-    # === АКТИВНЫЕ СОБЫТИЯ (в этом часу по Москве) ===
-    for hour, event, loc in SCHEDULE:
-        if hour == current_hour and total_sec < 3600:
+    # === АКТИВНЫЕ СОБЫТИЯ ===
+    for ev in events:
+        if ev['start_hour'] == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
             mins, secs = divmod(time_left, 60)
             active.append({
-                'name': event,
-                'location': loc,
+                'name': ev['name'],
+                'location': ev['location'],
                 'info': f"Заканчивается через {int(mins)}m {int(secs)}s",
-                'time': f"({hour}:00–{hour + 1}:00 МСК)"
+                'time': f"({ev['start_hour']}:00–{ev['end_hour']}:00 МСК)"
             })
 
-    # === ПРЕДСТОЯЩИЕ СОБЫТИЯ (в следующем часу по Москве) ===
+    # === ПРЕДСТОЯЩИЕ СОБЫТИЯ ===
     next_hour = (current_hour + 1) % 24
-    for hour, event, loc in SCHEDULE:
-        if hour == next_hour:
+    for ev in events:
+        if ev['start_hour'] == next_hour:
             time_until = 3600 - total_sec
             mins, secs = divmod(time_until, 60)
             upcoming.append({
-                'name': event,
-                'location': loc,
+                'name': ev['name'],
+                'location': ev['location'],
                 'info': f"Начнётся через {int(mins)}m {int(secs)}s",
                 'time': f"({next_hour}:00–{next_hour + 1}:00 МСК)"
             })
@@ -163,19 +117,23 @@ router = Router()
 async def start_handler(message: Message):
     kb = InlineKeyboardBuilder()
     kb.button(text="📅 События", callback_data="events")
-    kb.button(text="📺 Стрим", url=STREAM_URL)
-    kb.button(text="📢 Канал", url=CHANNEL_URL)
+    kb.button(text="📺 Мой стрим", url=STREAM_URL)
+    kb.button(text="📢 Мой канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
     kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: события (по расписанию из Excel)", reply_markup=kb.as_markup())
+    await message.answer("🎮 ARC Raiders: события (по расписанию с arcraidershub.com)", reply_markup=kb.as_markup())
 
 @router.callback_query(lambda c: c.data == "events")
 async def events_handler(callback: CallbackQuery):
     await callback.answer()
-    active, upcoming = get_current_events()
+    try:
+        active, upcoming = get_current_events()
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Ошибка: {e}")
+        return
 
     if not active and not upcoming:
-        msg = " agosto Нет событий."
+        msg = " august Нет событий."
     else:
         parts = ["🎮 <b>ARC Raiders: События</b> (время в Москве, UTC+3)\n"]
         if active:
@@ -204,7 +162,7 @@ async def events_handler(callback: CallbackQuery):
     if current_text != msg or current_markup != new_markup:
         try:
             await callback.message.edit_text(msg, parse_mode="HTML", reply_markup=new_markup)
-        except Exception:
+        except:
             await callback.message.answer(msg, parse_mode="HTML", reply_markup=new_markup)
     else:
         await callback.answer("Данные не изменились.")
@@ -213,7 +171,7 @@ dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (по Excel-расписанию, Moscow Time)")
+    print("✅ ARC Raiders Telegram-бот запущен (из arcraidershub.com)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
