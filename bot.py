@@ -42,116 +42,77 @@ def tr_map(name): return MAPS_RU.get(name, name)
 
 # === РАСПИСАНИЕ ИЗ EXCEL (время в Москве — UTC+3) ===
 SCHEDULE = [
-    # 0:00–1:00
-    (0, "Matriarch", "Spaceport"),
-
-    # 1:00–2:00
-    (1, "Husk Graveyard", "Blue Gate"),
-
-    # 2:00–3:00
-    (2, "Prospecting Probes", "Buried City"),
-    (2, "Electromagnetic Storm", "Dam"),
-    (2, "Night Raid", "Stella Montis"),
-    (2, "Uncovered Caches", "Dam"),
-
-    # 3:00–4:00
-    (3, "Matriarch", "Spaceport"),
-    (3, "Matriarch", "Dam"),
-
-    # 4:00–5:00
-    (4, "Prospecting Probes", "Buried City"),
-
-    # 5:00–6:00
-    (5, "Lush Blooms", "Buried City"),
+    # === HUSK GRAVEYARD ===
+    (17, "Husk Graveyard", "Buried City"),
+    (21, "Husk Graveyard", "Blue Gate"),
     (5, "Husk Graveyard", "Blue Gate"),
-    (5, "Uncovered Caches", "Buried City"),
+    (8, "Husk Graveyard", "Buried City"),
+    (13, "Husk Graveyard", "Dam"),
 
-    # 6:00–7:00
-    (6, "Launch Tower Loot", "Spaceport"),
-    (6, "Matriarch", "Dam"),
-    (6, "Matriarch", "Spaceport"),
+    # === LAUNCH TOWER LOOT ===
+    (9, "Launch Tower Loot", "Spaceport"),  # ← дубль удалён
+
+    # === LUSH BLOOMS ===
+    (15, "Lush Blooms", "Spaceport"),
+    (20, "Lush Blooms", "Dam"),
+    (20, "Lush Blooms", "Buried City"),
+    (23, "Lush Blooms", "Blue Gate"),
     (6, "Lush Blooms", "Dam"),
 
-    # 7:00–8:00
-    (7, "Night Raid", "Buried City"),
-    (7, "Prospecting Probes", "Spaceport"),
+    # === MATRIARCH ===
+    (23, "Matriarch", "Dam"),
+    (0, "Matriarch", "Spaceport"),
+    (2, "Matriarch", "Blue Gate"),
+    (3, "Matriarch", "Dam"),
+    (6, "Matriarch", "Spaceport"),
 
-    # 8:00–9:00
-    (8, "Electromagnetic Storm", "Blue Gate"),
-    (8, "Harvester", "Dam"),
-    (8, "Husk Graveyard", "Buried City"),
+    # === NIGHT RAID ===
+    (15, "Night Raid", "Buried City"),
+    (16, "Night Raid", "Spaceport"),
+    (17, "Night Raid", "Dam"),
+    (17, "Night Raid", "Stella Montis"),
+    (18, "Night Raid", "Buried City"),
 
-    # 9:00–10:00
-    (9, "Launch Tower Loot", "Spaceport"),
-    (9, "Night Raid", "Dam"),
+    # === PROSPECTING PROBES ===
+    (16, "Prospecting Probes", "Dam"),
+    (2, "Prospecting Probes", "Buried City"),
     (9, "Prospecting Probes", "Dam"),
-    (9, "Prospecting Probes", "Spaceport"),
+    (11, "Prospecting Probes", "Blue Gate"),
+    (12, "Prospecting Probes", "Spaceport"),
 
-    # 10:00–11:00
-    (10, "Husk Graveyard", "Dam"),
-    (10, "Night Raid", "Blue Gate"),
-    (10, "Prospecting Probes", "Buried City"),
+    # === UNCOVERED CACHES ===
+    (17, "Uncovered Caches", "Blue Gate"),
+    (18, "Uncovered Caches", "Spaceport"),
+    (23, "Uncovered Caches", "Buried City"),
+    (2, "Uncovered Caches", "Dam"),
+    (5, "Uncovered Caches", "Buried City"),
 
-    # 11:00–12:00
+    # === ELECTROMAGNETIC STORM ===
+    (19, "Electromagnetic Storm", "Spaceport"),
+    (19, "Electromagnetic Storm", "Blue Gate"),
+    (20, "Electromagnetic Storm", "Dam"),
+
+    # === HARVESTER ===
+    (19, "Harvester", "Dam"),
+    (20, "Harvester", "Blue Gate"),
+    (21, "Harvester", "Spaceport"),
+
+    # === ELECTROMAGNETIC STORM (ещё раз) ===
+    (1, "Electromagnetic Storm", "Blue Gate"),
+    (2, "Electromagnetic Storm", "Dam"),
+    (4, "Electromagnetic Storm", "Spaceport"),
     (11, "Electromagnetic Storm", "Blue Gate"),
     (11, "Electromagnetic Storm", "Dam"),
     (11, "Electromagnetic Storm", "Spaceport"),
-    (11, "Prospecting Probes", "Blue Gate"),
 
-    # 12:00–13:00
-    (12, "Harvester", "Spaceport"),
-    (12, "Prospecting Probes", "Spaceport"),
+    # === NIGHT RAID (ещё раз) ===
+    (20, "Night Raid", "Stella Montis"),
 
-    # 13:00–14:00
-    (13, "Lush Blooms", "Spaceport"),
-    (13, "Husk Graveyard", "Dam"),
+    # === PROSPECTING PROBES (ещё раз) ===
+    (9, "Prospecting Probes", "Spaceport"),
 
-    # 14:00–15:00
-    (14, "Uncovered Caches", "Dam"),
-
-    # 15:00–16:00
-    (15, "Lush Blooms", "Spaceport"),
-    (15, "Night Raid", "Buried City"),
-
-    # 16:00–17:00
-    (16, "Uncovered Caches", "Dam"),
-    (16, "Prospecting Probes", "Buried City"),
-    (16, "Night Raid", "Spaceport"),
-
-    # 17:00–18:00
-    (17, "Husk Graveyard", "Buried City"),
-    (17, "Uncovered Caches", "Blue Gate"),
-    (17, "Night Raid", "Dam"),
-    (17, "Night Raid", "Stella Montis"),
-
-    # 18:00–19:00
-    (18, "Night Raid", "Blue Gate"),
-    (18, "Uncovered Caches", "Spaceport"),
-
-    # 19:00–20:00
-    (19, "Harvester", "Dam"),
-    (19, "Electromagnetic Storm", "Spaceport"),
-    (19, "Harvester", "Dam"),
-    (19, "Electromagnetic Storm", "Blue Gate"),
-
-    # 20:00–21:00
-    (20, "Harvester", "Blue Gate"),
-    (20, "Lush Blooms", "Dam"),
-    (20, "Lush Blooms", "Buried City"),
-    (20, "Electromagnetic Storm", "Dam"),
-    (20, "Night Raid", "Stella Montis")
-    ,
-    (21, "Husk Graveyard", "Blue Gate"),
-    (21, "Harvester", "Spaceport"),
-
-    # 22:00–23:00
-    (22, "Electromagnetic Storm", "Spaceport"),
-    (22, "Husk Graveyard", "Blue Gate"),
-
-    # 23:00–0:00
-    (23, "Uncovered Caches", "Buried City"),
-    (23, "Lush Blooms", "Blue Gate"),
-    (23, "Matriarch", "Dam"),
+    # === Matriarch (ещё раз) ===
+    (22, "Matriarch", "Spaceport"),
 ]
 
 def get_current_events():
