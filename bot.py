@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import Command
@@ -24,7 +24,6 @@ EVENTS_RU = {
     "Uncovered Caches": "Обнаруженные Тайники",
     "Electromagnetic Storm": "Электромагнитная Буря",
     "Harvester": "Жнец",
-    "Hidden Bunker": "Скрытый Бункер",
     "Husk Graveyard": "Кладбище Хасков",
     "Launch Tower Loot": "Добыча с Пусковой Башни",
     "Prospecting Probes": "Разведывательные Зонды",
@@ -64,12 +63,12 @@ SCHEDULE = [
 
     (0, "Harvester", "Spaceport"),
     (1, "Launch Tower Loot", "Spaceport"),
-    (2, "Hidden Bunker", "Spaceport"),  # ← ВРЕМЕННО ОТКЛЮЧЁН
+    # (2, "Hidden Bunker", "Spaceport"),  # ← ИСКЛЮЧЁН
     (3, "Husk Graveyard", "Blue Gate"),
     (4, "Night Raid", "Spaceport"),
     (5, "Lush Blooms", "Buried City"),
     (6, "Matriarch", "Blue Gate"),
-    (7, "Hidden Bunker", "Blue Gate"),  # ← ВРЕМЕННО ОТКЛЮЧЁН
+    # (7, "Hidden Bunker", "Blue Gate"),  # ← ИСКЛЮЧЁН
     (8, "Night Raid", "Buried City"),
     (9, "Electromagnetic Storm", "Dam"),
     (10, "Harvester", "Blue Gate"),
@@ -87,9 +86,7 @@ SCHEDULE = [
 def get_current_events():
     now = datetime.now(timezone.utc)
     current_hour = now.hour
-    minutes = now.minute
-    seconds = now.second
-    total_sec = minutes * 60 + seconds
+    total_sec = now.minute * 60 + now.second
 
     active = []
     upcoming = []
@@ -99,12 +96,11 @@ def get_current_events():
         if hour == current_hour and total_sec < 3600:
             time_left = 3600 - total_sec
             mins, secs = divmod(time_left, 60)
-            if event != "Hidden Bunker":  # Исключаем
-                active.append({
-                    'name': event,
-                    'location': loc,
-                    'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
-                })
+            active.append({
+                'name': event,
+                'location': loc,
+                'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
+            })
 
     # === ПРЕДСТОЯЩИЕ СОБЫТИЯ ===
     next_hour = (current_hour + 1) % 24
@@ -112,12 +108,11 @@ def get_current_events():
         if hour == next_hour:
             time_until = 3600 - total_sec
             mins, secs = divmod(time_until, 60)
-            if event != "Hidden Bunker":  # Исключаем
-                upcoming.append({
-                    'name': event,
-                    'location': loc,
-                    'info': f"Начнётся через {int(mins)}m {int(secs)}s"
-                })
+            upcoming.append({
+                'name': event,
+                'location': loc,
+                'info': f"Начнётся через {int(mins)}m {int(secs)}s"
+            })
 
     return active, upcoming
 
@@ -175,7 +170,7 @@ dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (статичный таймер)")
+    print("✅ ARC Raiders Telegram-бот запущен (статичный таймер, без Hidden Bunker)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
