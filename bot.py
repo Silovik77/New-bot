@@ -185,6 +185,26 @@ def get_current_events():
 
     return active, upcoming
 
+# === ОБНОВЛЕНИЯ ИГРЫ ===
+GAME_UPDATES = """
+🎮 <b>ARC Raiders — Последние обновления</b>
+
+🔧 <b>v1.2.6 (07.12.2025)</b>
+• Исправлен баг с исчезающими ящиками в Плотине
+• Уменьшен урон Жнеца на 10%
+• Добавлена новая карта: Стелла Монтиc (бета)
+• Оптимизация FPS на слабых ПК
+
+🔧 <b>v1.2.5 (05.12.2025)</b>
+• Исправлен вылет при входе в подземелья
+• Снижена длительность Ночного Налёта с 2ч до 1ч
+• Исправлено отображение событий в UTC
+
+🔗 <b>Официальные ресурсы</b>
+• Сайт: https://arcreaiders.com  
+• Discord: https://discord.gg/arc-raiders
+"""
+
 # === TELEGRAM ===
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -194,10 +214,11 @@ router = Router()
 async def start_handler(message: Message):
     kb = InlineKeyboardBuilder()
     kb.button(text="📅 События", callback_data="events")
+    kb.button(text="🆕 Обновления игры", callback_data="updates")  # ← НОВАЯ КНОПКА
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
-    kb.adjust(2)
+    kb.adjust(2)  # 2 кнопки в строке
     await message.answer("🎮 ARC Raiders: события (по расписанию из hub.arcraiders.com)", reply_markup=kb.as_markup())
 
 @router.callback_query(lambda c: c.data == "events")
@@ -224,6 +245,7 @@ async def events_handler(callback: CallbackQuery):
 
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="events")
+    kb.button(text="🆕 Обновления", callback_data="updates")  # ← КНОПКА ВНУТРИ
     kb.button(text="📺 Стрим", url=STREAM_URL)
     kb.button(text="📢 Канал", url=CHANNEL_URL)
     kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
@@ -240,11 +262,25 @@ async def events_handler(callback: CallbackQuery):
     else:
         await callback.answer("Данные не изменились.")
 
+# === ОБНОВЛЕНИЯ ИГРЫ ===
+@router.callback_query(lambda c: c.data == "updates")
+async def updates_handler(callback: CallbackQuery):
+    await callback.answer()
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="updates")
+    kb.button(text="📅 События", callback_data="events")
+    kb.button(text="📺 Стрим", url=STREAM_URL)
+    kb.button(text="📢 Канал", url=CHANNEL_URL)
+    kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
+    kb.adjust(2)
+
+    await callback.message.edit_text(GAME_UPDATES, parse_mode="HTML", reply_markup=kb.as_markup())
+
 dp.include_router(router)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (по расписанию из Excel, Moscow Time)")
+    print("✅ ARC Raiders Telegram-бот запущен (с обновлениями игры)")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
