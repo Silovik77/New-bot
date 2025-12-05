@@ -120,7 +120,6 @@ SCHEDULE = [
 
     # 17:00–18:00
     (17, "Husk Graveyard", "Buried City"),
-    (17, "Electromagnetic Storm", "Dam"),
     (17, "Uncovered Caches", "Blue Gate"),
     (17, "Night Raid", "Dam"),
     (17, "Night Raid", "Stella Montis"),
@@ -128,21 +127,22 @@ SCHEDULE = [
     # 18:00–19:00
     (18, "Night Raid", "Blue Gate"),
     (18, "Uncovered Caches", "Spaceport"),
-    (18, "Night Raid", "Buried City"),
 
     # 19:00–20:00
     (19, "Harvester", "Dam"),
     (19, "Electromagnetic Storm", "Spaceport"),
-    (19, "Electromagnetic Storm", "Spaceport"),
+    (19, "Harvester", "Dam"),
     (19, "Electromagnetic Storm", "Blue Gate"),
 
     # 20:00–21:00
-    (20, "Matriarch", "Blue Gate"),
-    (20, "Night Raid", "Dam"),
+    (20, "Harvester", "Blue Gate"),
+    (20, "Lush Blooms", "Dam")
     (20, "Lush Blooms", "Buried City"),
+    (20, "Electromagnetic Storm", "Dam"),
+    (20,"Night Raid", "Stella Montis")
 
     # 21:00–22:00
-    (21, "Prospecting Probes", "Buried City"),
+    (21, "Night Raid", "Buried City"),
     (21, "Husk Graveyard", "Blue Gate"),
     (21, "Harvester", "Spaceport"),
 
@@ -151,9 +151,8 @@ SCHEDULE = [
     (22, "Husk Graveyard", "Blue Gate"),
 
     # 23:00–0:00
-    (23, "Prospecting Probes", "Dam"),
-    (23, "Prospecting Probes", "Blue Gate"),
-    (23, "Prospecting Probes", "Spaceport"),
+    (23, "Uncovered Caches", "Buried City"),
+    (23, "Lush Blooms", "Blue Gate"),
     (23, "Matriarch", "Dam"),
 ]
 
