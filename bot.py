@@ -93,36 +93,94 @@ def get_current_events():
     current_hour = now.hour
     total_sec = now.minute * 60 + now.second
 
+    # Список событий из "Active now" и "Upcoming next"
+    events = [
+        # === АКТИВНЫЕ СЕЙЧАС (8:00–9:00 UTC) ===
+        {"hour": 8, "name": "Lush Blooms", "location": "Blue Gate", "status": "active"},
+        {"hour": 8, "name": "Matriarch", "location": "Dam", "status": "active"},
+        {"hour": 8, "name": "Night Raid", "location": "Dam", "status": "active"},
+        {"hour": 8, "name": "Night Raid", "location": "Stella Montis", "status": "active"},
+        {"hour": 8, "name": "Uncovered Caches", "location": "Buried City", "status": "active"},
+
+        # === ПРЕДСТОЯЩИЕ (9:00–10:00 UTC) ===
+        {"hour": 9, "name": "Matriarch", "location": "Spaceport", "status": "upcoming"},
+        {"hour": 9, "name": "Night Raid", "location": "Buried City", "status": "upcoming"},
+
+        # === ОСТАЛЬНЫЕ СОБЫТИЯ В ЦИКЛЕ (из блоков ниже) ===
+        {"hour": 10, "name": "Husk Graveyard", "location": "Dam", "status": "upcoming"},
+        {"hour": 10, "name": "Husk Graveyard", "location": "Buried City", "status": "upcoming"},
+        {"hour": 10, "name": "Husk Graveyard", "location": "Blue Gate", "status": "upcoming"},
+        {"hour": 10, "name": "Night Raid", "location": "Blue Gate", "status": "upcoming"},
+        {"hour": 10, "name": "Prospecting Probes", "location": "Buried City", "status": "upcoming"},
+
+        {"hour": 11, "name": "Electromagnetic Storm", "location": "Dam", "status": "upcoming"},
+        {"hour": 11, "name": "Electromagnetic Storm", "location": "Spaceport", "status": "upcoming"},
+        {"hour": 11, "name": "Electromagnetic Storm", "location": "Blue Gate", "status": "upcoming"},
+        {"hour": 11, "name": "Matriarch", "location": "Blue Gate", "status": "upcoming"},
+
+        {"hour": 12, "name": "Harvester", "location": "Spaceport", "status": "upcoming"},
+
+        {"hour": 13, "name": "Matriarch", "location": "Dam", "status": "upcoming"},
+
+        {"hour": 14, "name": "Night Raid", "location": "Spaceport", "status": "upcoming"},
+
+        {"hour": 15, "name": "Lush Blooms", "location": "Spaceport", "status": "upcoming"},
+
+        {"hour": 16, "name": "Uncovered Caches", "location": "Dam", "status": "upcoming"},
+        {"hour": 16, "name": "Husk Graveyard", "location": "Blue Gate", "status": "upcoming"},
+
+        {"hour": 17, "name": "Electromagnetic Storm", "location": "Dam", "status": "upcoming"},
+
+        {"hour": 18, "name": "Night Raid", "location": "Blue Gate", "status": "upcoming"},
+        {"hour": 18, "name": "Prospecting Probes", "location": "Spaceport", "status": "upcoming"},
+
+        {"hour": 19, "name": "Harvester", "location": "Blue Gate", "status": "upcoming"},
+        {"hour": 19, "name": "Matriarch", "location": "Blue Gate", "status": "upcoming"},
+
+        {"hour": 20, "name": "Lush Blooms", "location": "Blue Gate", "status": "active"},
+        {"hour": 20, "name": "Matriarch", "location": "Dam", "status": "active"},
+        {"hour": 20, "name": "Night Raid", "location": "Dam", "status": "active"},
+        {"hour": 20, "name": "Night Raid", "location": "Stella Montis", "status": "active"},
+        {"hour": 20, "name": "Uncovered Caches", "location": "Buried City", "status": "active"},
+
+        {"hour": 21, "name": "Matriarch", "location": "Spaceport", "status": "upcoming"},
+        {"hour": 21, "name": "Night Raid", "location": "Buried City", "status": "upcoming"},
+
+        {"hour": 22, "name": "Electromagnetic Storm", "location": "Blue Gate", "status": "upcoming"},
+        {"hour": 22, "name": "Electromagnetic Storm", "location": "Dam", "status": "upcoming"},
+        {"hour": 22, "name": "Electromagnetic Storm", "location": "Spaceport", "status": "upcoming"},
+
+        {"hour": 23, "name": "Prospecting Probes", "location": "Buried City", "status": "upcoming"},
+        {"hour": 23, "name": "Prospecting Probes", "location": "Dam", "status": "upcoming"},
+        {"hour": 23, "name": "Prospecting Probes", "location": "Blue Gate", "status": "upcoming"},
+        {"hour": 23, "name": "Prospecting Probes", "location": "Spaceport", "status": "upcoming"},
+    ]
+
+    # Удаляем "Hidden Bunker" — даже если он попал сюда
+    events = [e for e in events if e["name"] != "Hidden Bunker"]
+
     active = []
     upcoming = []
 
-    # Активные события (в этом часу UTC)
-    for hour, event, maps in EVENT_SCHEDULE:
-        if hour == current_hour and total_sec < 3600:
+    for e in events:
+        if e["hour"] == current_hour and total_sec < 3600 and e["status"] == "active":
             time_left = 3600 - total_sec
             mins, secs = divmod(time_left, 60)
-            for loc in maps:
-                active.append({
-                    'name': event,
-                    'location': loc,
-                    'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
-                })
-
-    # Предстоящие события (в следующем часу UTC)
-    next_hour = (current_hour + 1) % 24
-    for hour, event, maps in EVENT_SCHEDULE:
-        if hour == next_hour:
+            active.append({
+                'name': e['name'],
+                'location': e['location'],
+                'info': f"Заканчивается через {int(mins)}m {int(secs)}s"
+            })
+        elif e["hour"] == (current_hour + 1) % 24 and e["status"] == "upcoming":
             time_until = 3600 - total_sec
             mins, secs = divmod(time_until, 60)
-            for loc in maps:
-                upcoming.append({
-                    'name': event,
-                    'location': loc,
-                    'info': f"Начнётся через {int(mins)}m {int(secs)}s"
-                })
+            upcoming.append({
+                'name': e['name'],
+                'location': e['location'],
+                'info': f"Начнётся через {int(mins)}m {int(secs)}s"
+            })
 
     return active, upcoming
-
 
 # === TELEGRAM ===
 bot = Bot(token=BOT_TOKEN)
