@@ -42,99 +42,28 @@ def tr_map(name): return MAPS_RU.get(name, name)
 
 # === ПОЛНОЕ РАСПИСАНИЕ (из Excel + HTML) ===
 SCHEDULE = [
-    # 0:00–1:00 UTC
-    (0, "Matriarch", "Spaceport"),
-
-
-    # 1:00–2:00 UTC
-    (1, "Electromagnetic Storm", "Blue Gate"),
-
-    # 2:00–3:00 UTC
-    (2, "Uncovered Caches", "Dam"),
-    (2, "Matriarch", "Blue Gate"),
-    (2, "Electromagnetic Storm", "Dam"),
-    (2, "Prospecting Probes", "Buried City"),
-
-    # 3:00–4:00 UTC
-    (3, "Matriarch", "Dam"),
-(3, "Harvester", "Spaceport"),
-
-
-    # 5:00–6:00 UTC
-    (5, "Lush Blooms", "Buried City"),
-
-    # 6:00–7:00 UTC
-    (6, "Matriarch", "Blue Gate"),
-    (6, "Electromagnetic Storm", "Spaceport"),
-
-    # 7:00–8:00 UTC
-    (7, "Night Raid", "Buried City"),
-
-    # 8:00–9:00 UTC
-    (8, "Electromagnetic Storm", "Blue Gate"),
-    (8, "Harvester", "Dam"),
-
-    # 9:00–10:00 UTC
+    # (час_начала_мск, событие, карта)
     (9, "Launch Tower Loot", "Spaceport"),
-    (9, "Night Raid", "Dam"),
-
-    # 10:00–11:00 UTC
-    (10, "Husk Graveyard", "Dam"),
-    (10, "Husk Graveyard", "Buried City"),
-    (10, "Husk Graveyard", "Blue Gate"),
-
-    # 11:00–12:00 UTC
-    (11, "Electromagnetic Storm", "Blue Gate"),
-    (11, "Electromagnetic Storm", "Dam"),
-    (11, "Electromagnetic Storm", "Spaceport"),
-
-    # 12:00–13:00 UTC
-    (12, "Harvester", "Spaceport"),
-    (12, "Prospecting Probes", "Spaceport"),
-
-    # 13:00–14:00 UTC
-    (13, "Lush Blooms", "Spaceport"),
-
-    # 14:00–15:00 UTC
-    (14, "Uncovered Caches", "Dam"),
-
-    # 15:00–16:00 UTC
+    (9, "Launch Tower Loot", "Spaceport"),
     (15, "Lush Blooms", "Spaceport"),
     (15, "Night Raid", "Buried City"),
-
-    # 16:00–17:00 UTC
-    (16, "Night Raid", "Spaceport"),
+    (16, "Night Raid", "Dam"),
     (16, "Prospecting Probes", "Dam"),
-
-
-    # 17:00–18:00 UTC
     (17, "Husk Graveyard", "Buried City"),
-    (17, "Electromagnetic Storm", "Dam"),
-
-    # 18:00–19:00 UTC
-    (18, "Night Raid", "Blue Gate"),
-    (18, "Prospecting Probes", "Spaceport"),
-
-    # 19:00–20:00 UTC
-    (19, "Harvester", "Dam"),
+    (17, "Uncovered Caches", "Blue Gate"),
+    (18, "Uncovered Caches", "Spaceport"),
     (19, "Electromagnetic Storm", "Spaceport"),
-
-    # 20:00–21:00 UTC
-    (20, "Matriarch", "Blue Gate"),
+    (19, "Electromagnetic Storm", "Blue Gate"),
+    (19, "Harvester", "Dam"),
+    (20, "Harvester", "Blue Gate"),
+    (20, "Lush Blooms", "Buried City"),
     (20, "Night Raid", "Dam"),
-    (20, "Lush Blooms", "Blue Gate"),
-
-    # 21:00–22:00 UTC
-    (21, "Matriarch", "Spaceport"),
-    (21, "Prospecting Probes", "Buried City"),
-
-    # 22:00–23:00 UTC
-    (22, "Husk Graveyard", "Blue Gate"),
-
-    # 23:00–0:00 UTC
-    (23, "Prospecting Probes", "Dam"),
-    (23, "Prospecting Probes", "Blue Gate"),
-    (23, "Prospecting Probes", "Spaceport"),
+    (21, "Husk Graveyard", "Blue Gate"),
+    (23, "Matriarch", "Dam"),
+    (0, "Matriarch", "Spaceport"),
+    (2, "Prospecting Probes", "Buried City"),
+    (9, "Prospecting Probes", "Dam"),
+]
 ]
 
 def get_current_events():
