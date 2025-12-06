@@ -118,8 +118,10 @@ SCHEDULE = [
     (17, "Night Raid", "Dam"),
     (17, "Husk Graveyard", "Buried City"),
     (17, "Uncovered Caches", "Blue Gate"),
+    (17, "Night Raid", "Stella Montis"),
 
     (18, "Uncovered Caches", "Spaceport"),
+    (18, "Night Raid", "Buried City"),
 
     (19, "Harvester", "Dam"),
     (19, "Electromagnetic Storm", "Spaceport"),
