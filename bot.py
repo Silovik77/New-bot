@@ -113,7 +113,7 @@ SCHEDULE = [
 
     (16, "Prospecting Probes", "Dam"),
     (16, "Night Raid", "Spaceport"),
-    (16, "Night Raid", "Stella Montis"),
+
 
     (17, "Night Raid", "Dam"),
     (17, "Husk Graveyard", "Buried City"),
