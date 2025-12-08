@@ -2,9 +2,7 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-import re # Для регулярных выражений при парсинге
 import requests
-from bs4 import BeautifulSoup # Необходимо установить: pip install beautifulsoup4 lxml
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -14,7 +12,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
-EVENT_TIMERS_URL = 'https://metaforge.app/arc-raiders/event-timers'
+EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
 
 # --- Настройка логирования ---
 logging.basicConfig(level=logging.INFO)
@@ -72,141 +70,174 @@ GAME_UPDATE_TEXT = """
 📅 Следующее обновление: 17.12.2025
 """
 
-# --- Функции для получения и парсинга данных из HTML ---
+# --- Функции для получения и обработки данных из API ---
 
-def parse_time_string(time_str):
-    """Преобразует строку времени (например, '8m 48s', '1h 8m 48s') в timedelta."""
-    if not time_str:
-        return timedelta(seconds=0)
-
-    # Ищем часы, минуты и секунды в строке
-    hours_match = re.search(r'(\d+)\s*h', time_str, re.IGNORECASE)
-    minutes_match = re.search(r'(\d+)\s*m', time_str, re.IGNORECASE)
-    seconds_match = re.search(r'(\d+)\s*s', time_str, re.IGNORECASE)
-
-    hours = int(hours_match.group(1)) if hours_match else 0
-    minutes = int(minutes_match.group(1)) if minutes_match else 0
-    seconds = int(seconds_match.group(1)) if seconds_match else 0
-
-    return timedelta(hours=hours, minutes=minutes, seconds=seconds)
-
-def get_arc_raiders_events_from_html():
-    """Получает и парсит события с HTML-страницы MetaForge."""
+def get_arc_raiders_events_from_api_calculated():
+    """Получает события из API MetaForge и вычисляет активные/предстоящие на основе расписания."""
     try:
-        response = requests.get(EVENT_TIMERS_URL)
+        response = requests.get(EVENT_TIMERS_API_URL)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+        data = response.json()
 
+        raw_events = data.get('data', [])
         active_events = []
         upcoming_events = []
 
-        # Находим секции "Active now" и "Upcoming next"
-        active_section = soup.find(string=re.compile(r"Active now", re.IGNORECASE))
-        if active_section:
-            active_section = active_section.parent.parent # Поднимаемся к родительскому div контейнера
-            active_items = active_section.find_all('div', recursive=False)
-            for item in active_items:
-                 # Проверяем, содержит ли div информацию о событии (обычно содержит img и span)
-                 if item.find('img') and item.find('span'):
-                    event_text = item.get_text(strip=True)
-                    # Регулярное выражение для извлечения: [Название] [Локация] Ends in [Время]
-                    # Учитываем возможные пробелы между частями
-                    match = re.search(r'([^(]+?)\s+([^(]+?)\s+Ends\s+in\s+([\d\w\s]+)', event_text, re.IGNORECASE)
-                    if match:
-                        name = match.group(1).strip()
-                        location = match.group(2).strip()
-                        time_left_str = match.group(3).strip()
-                        time_left = parse_time_string(time_left_str)
-                        # Вычисляем время окончания
-                        end_time_utc = datetime.now(timezone.utc) + time_left
-                        active_events.append({
-                            'name': name,
-                            'location': location,
-                            'time_left': time_left_str,
-                            'end_time': end_time_utc
-                        })
-                        logger.info(f"Добавлено активное событие из HTML: {name} на {location}, осталось {time_left_str}")
+        current_time_utc = datetime.now(timezone.utc) # <-- offset-aware
+        current_date_utc = current_time_utc.date()
+        current_time_only = current_time_utc.time()  # <-- offset-naive time object
 
-        upcoming_section = soup.find(string=re.compile(r"Upcoming next", re.IGNORECASE))
-        if upcoming_section:
-            upcoming_section = upcoming_section.parent.parent # Поднимаемся к родительскому div контейнера
-            upcoming_items = upcoming_section.find_all('div', recursive=False)
-            for item in upcoming_items:
-                 # Проверяем, содержит ли div информацию о событие (обычно содержит img и span)
-                 if item.find('img') and item.find('span'):
-                    event_text = item.get_text(strip=True)
-                    # Регулярное выражение для извлечения: [Название] [Локация] Starts in [Время]
-                    match = re.search(r'([^(]+?)\s+([^(]+?)\s+Starts\s+in\s+([\d\w\s]+)', event_text, re.IGNORECASE)
-                    if match:
-                        name = match.group(1).strip()
-                        location = match.group(2).strip()
-                        time_to_start_str = match.group(3).strip()
-                        time_to_start = parse_time_string(time_to_start_str)
-                        # Вычисляем время начала
-                        start_time_utc = datetime.now(timezone.utc) + time_to_start
-                        upcoming_events.append({
-                            'name': name,
-                            'location': location,
+        # Словарь для отслеживания ближайшего предстоящего окна для каждого (название, карта)
+        next_upcoming_for_location = {}
+
+        for event_obj in raw_events:
+            name = event_obj.get('name', 'Unknown Event')
+            location = event_obj.get('map', 'Unknown Location')
+            times_list = event_obj.get('times', [])
+
+            # Проходим по каждому временному окну события на этой карте
+            for time_window in times_list:
+                start_str = time_window.get('start') # Например, "01:00"
+                end_str = time_window.get('end')     # Например, "02:00"
+
+                if not start_str or not end_str:
+                    logger.warning(f"Missing start or end time for event {name} at {location}")
+                    continue
+
+                try:
+                    # Парсим время из строки "HH:MM" в объект time
+                    start_time = datetime.strptime(start_str, '%H:%M').time() # <-- offset-naive time object
+                    end_time = datetime.strptime(end_str, '%H:%M').time()     # <-- offset-naive time object
+
+                    # --- Вычисление активности ---
+                    # Случай 1: start и end в один день (например, 01:00 - 02:00)
+                    if start_time <= end_time:
+                        if start_time <= current_time_only < end_time:
+                            # Событие активно сегодня
+                            # Вычисляем время окончания как datetime объект (на сегодня, в UTC)
+                            # datetime.combine создает offset-naive datetime, нужно сделать его aware
+                            end_datetime_naive = datetime.combine(current_date_utc, end_time)
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+
+                            # Если end_datetime <= current_time_utc (например, из-за секунд/миллисекунд), добавляем день
+                            if end_datetime <= current_time_utc:
+                                logger.warning(f"End time {end_datetime} is <= current time {current_time_utc}, adding 1 day.")
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
+                                end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc)
+
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
+                            total_seconds = int(time_left.total_seconds())
+                            hours, remainder = divmod(total_seconds, 3600)
+                            minutes, seconds = divmod(remainder, 60)
+                            time_parts = []
+                            if hours > 0: time_parts.append(f"{hours}ч")
+                            if minutes > 0: time_parts.append(f"{minutes}м")
+                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
+                            time_left_str = " ".join(time_parts)
+
+                            active_events.append({
+                                'name': name,
+                                'location': location,
+                                'time_left': time_left_str,
+                                'end_time': end_datetime
+                            })
+                            logger.info(f"Добавлено активное событие (сегодня): {name} на {location}, осталось {time_left_str}")
+                            # Переходим к следующему окну, т.к. активное уже найдено для этого (name, location)
+                            continue
+
+                    # Случай 2: start > end (например, 23:00 - 01:00 -> событие пересекает полночь)
+                    else: # start_time > end_time
+                        if (current_time_only >= start_time) or (current_time_only < end_time):
+                            # Событие активно сегодня или перешло на завтра
+                            # Вычисляем время окончания
+                            # Если текущее время >= start_time, значит событие началось сегодня и закончится завтра
+                            if current_time_only >= start_time:
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
+                            else: # current_time_only < end_time -> событие началось вчера и заканчивается сегодня
+                                end_datetime_naive = datetime.combine(current_date_utc, end_time)
+
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
+                            total_seconds = int(time_left.total_seconds())
+                            hours, remainder = divmod(total_seconds, 3600)
+                            minutes, seconds = divmod(remainder, 60)
+                            time_parts = []
+                            if hours > 0: time_parts.append(f"{hours}ч")
+                            if minutes > 0: time_parts.append(f"{minutes}м")
+                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
+                            time_left_str = " ".join(time_parts)
+
+                            active_events.append({
+                                'name': name,
+                                'location': location,
+                                'time_left': time_left_str,
+                                'end_time': end_datetime
+                            })
+                            logger.info(f"Добавлено активное событие (переходящее): {name} на {location}, осталось {time_left_str}")
+                            continue # Переходим к следующему окну
+
+
+                    # --- Вычисление предстоящего ---
+                    # Если не активно, ищем ближайшее время начала
+                    # Случай 1: start и end в один день (например, 01:00 - 02:00)
+                    if start_time <= end_time:
+                        if start_time > current_time_only: # Начнётся сегодня
+                            start_datetime_naive = datetime.combine(current_date_utc, start_time)
+                        else: # Началось сегодня, но уже прошло, ищем на завтра
+                            start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+                    # Случай 2: start > end (например, 23:00 - 01:00)
+                    else: # start_time > end_time
+                        if current_time_only < start_time and current_time_only >= end_time: # Событие еще не началось сегодня (например, 22:00, а старт в 23:00)
+                            start_datetime_naive = datetime.combine(current_date_utc, start_time)
+                        else: # Событие уже прошло сегодня, ищем на завтра или позже
+                            start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+
+                    # Сделать start_datetime aware
+                    start_datetime = start_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+
+                    time_to_start = start_datetime - current_time_utc # <-- Теперь оба aware
+                    total_seconds = int(time_to_start.total_seconds())
+                    hours, remainder = divmod(total_seconds, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    time_parts = []
+                    if hours > 0: time_parts.append(f"{hours}ч")
+                    if minutes > 0: time_parts.append(f"{minutes}м")
+                    if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
+                    time_to_start_str = " ".join(time_parts)
+
+                    # Проверяем, является ли это окно ближайшим для данной пары (name, location)
+                    key = (name, location)
+                    if key not in next_upcoming_for_location or start_datetime < next_upcoming_for_location[key]['start_time']:
+                        next_upcoming_for_location[key] = {
                             'time_left': time_to_start_str,
-                            'start_time': start_time_utc
-                        })
-                        logger.info(f"Добавлено предстоящее событие из HTML: {name} на {location}, начнётся через {time_to_start_str}")
+                            'start_time': start_datetime # <-- Убедиться, что это aware
+                        }
+                        logger.info(f"Найдено предстоящее событие для {name} на {location}, начнётся через {time_to_start_str} ({start_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')})")
 
-        # Обработка сложных событий типа Electromagnetic Storm
-        # Ищем div'ы после "Upcoming next", которые содержат заголовок (h4 или strong) и списки
-        # Начинаем искать после контейнера "Upcoming next"
-        if upcoming_section:
-            sections_after_upcoming = upcoming_section.find_next_siblings('div')
-            for section in sections_after_upcoming:
-                title_elem = section.find(['h4', 'strong'])
-                if title_elem:
-                    event_name = title_elem.get_text(strip=True)
-                    # Ищем "Starts in" в этом же div или ближайшем родителе
-                    starts_in_match = re.search(r'Starts\s+in\s+([\d\w\s]+)', section.get_text(), re.IGNORECASE)
-                    if starts_in_match:
-                        time_to_start_str = starts_in_match.group(1).strip()
-                        time_to_start = parse_time_string(time_to_start_str)
-                        start_time_utc = datetime.now(timezone.utc) + time_to_start
+                except ValueError as e:
+                    logger.error(f"Error parsing time for event {name} at {location}: {start_str}, {end_str}. Error: {e}")
 
-                        # Ищем "Upcoming windows"
-                        windows_header = section.find(string=re.compile(r"Upcoming windows", re.IGNORECASE))
-                        if windows_header:
-                            windows_list = windows_header.parent.find_next_sibling('div')
-                            if windows_list:
-                                window_items = windows_list.find_all('div', recursive=False)
-                                for window_item in window_items:
-                                    win_text = window_item.get_text(strip=True)
-                                    # Регулярное выражение для извлечения: [Время] [Локация] \n in [Время]
-                                    win_match = re.search(r'([\d:]+\s*[-–]\s*[\d:]+)\s+([^(]+?)\s+in\s+([\d\w\s]+)', win_text, re.IGNORECASE)
-                                    if win_match:
-                                        time_period = win_match.group(1).strip()
-                                        location = win_match.group(2).strip()
-                                        time_to_window_str = win_match.group(3).strip()
-                                        time_to_window = parse_time_string(time_to_window_str)
-                                        window_start_time = datetime.now(timezone.utc) + time_to_window
+        # После обработки всех событий, добавляем ближайшие предстоящие из словаря
+        for (name, location), event_info in next_upcoming_for_location.items():
+             upcoming_events.append({
+                 'name': name,
+                 'location': location,
+                 'time_left': event_info['time_left'],
+                 'start_time': event_info['start_time'] # <-- Должно быть aware
+             })
 
-                                        # Добавляем каждое окно как отдельное предстоящее событие
-                                        upcoming_events.append({
-                                            'name': event_name,
-                                            'location': location,
-                                            'time_left': time_to_window_str,
-                                            'start_time': window_start_time,
-                                            'period': time_period
-                                        })
-                                        logger.info(f"Добавлено предстоящее окно сложного события из HTML: {event_name} на {location}, начнётся через {time_to_window_str}")
-
-        # Сортировка предстоящих событий по времени начала
-        # Это ключевой момент: все предстоящие события (включая "окна") сортируются по времени начала
+        # Сортируем предстоящие события по времени начала
+        # Сортировка будет корректной, так как start_time теперь aware
         upcoming_events.sort(key=lambda x: x['start_time'])
 
-        logger.info(f"Парсинг HTML завершён: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
+        logger.info(f"Вычисление по API завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
         return active_events, upcoming_events
 
     except requests.RequestException as e:
-        logger.error(f"Ошибка при получении данных с {EVENT_TIMERS_URL}: {e}")
+        logger.error(f"Ошибка при получении данных из API: {e}")
         return [], []
     except Exception as e:
-        logger.error(f"Ошибка при парсинге HTML: {e}")
+        logger.error(f"Неожиданная ошибка при обработке данных из API: {e}")
         return [], []
 
 # --- Обработчики команд и кнопок ---
@@ -241,12 +272,11 @@ async def process_callback_events(callback_query: types.CallbackQuery):
 
 # Функция отправки или редактирования сообщения с событиями
 async def send_events_message(message: types.Message, edit: bool = False):
-    # Вызываем функцию получения данных из HTML
-    active, upcoming = get_arc_raiders_events_from_html()
+    active, upcoming = get_arc_raiders_events_from_api_calculated()
 
     # Форматируем активные события
     active_message = format_event_message(active, "active")
-    # Форматируем ВСЕ предстоящие события (без ограничения), они уже отсортированы по времени начала
+    # Форматируем ВСЕ предстоящие события (без ограничения)
     upcoming_message = format_event_message(upcoming, "upcoming")
 
     # Объединяем сообщения
@@ -318,14 +348,12 @@ def format_event_message(events, event_type="active"):
         if event_type == "active":
             message += f"- **{translated_name}** на карте **{translated_location}** (осталось: {event['time_left']})\n"
         else:
-            # Добавляем период времени, если он есть (для сложных событий)
-            time_period = f" ({event.get('period', '')})" if event.get('period') else ""
-            message += f"- **{translated_name}** на карте **{translated_location}**{time_period} (начнётся через: {event['time_left']})\n"
+            message += f"- **{translated_name}** на карте **{translated_location}** (начнётся через: {event['time_left']})\n"
     return message
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием парсинга HTML, кнопками ссылок, текстом об обновлении и редактированием сообщений...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
