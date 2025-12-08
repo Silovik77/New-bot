@@ -82,6 +82,7 @@ SCHEDULE = [
     (8, "Electromagnetic Storm", "Dam"),
     (8, "Husk Graveyard", "Buried City"),
     (8, "Harvester", "Blue Gate"),
+    (8, "Night Raid", "Stella Montis"),
 
     (9, "Launch Tower Loot", "Spaceport"),
     (9, "Prospecting Probes", "Dam"),
