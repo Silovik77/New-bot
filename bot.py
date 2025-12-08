@@ -36,9 +36,9 @@ def get_arc_raiders_events_from_api_calculated():
         active_events = []
         upcoming_events = []
 
-        current_time_utc = datetime.now(timezone.utc)
-        # Используем только время (часы и минуты) для сравнения с расписанием
-        current_time_only = current_time_utc.time()
+        current_time_utc = datetime.now(timezone.utc) # <-- offset-aware
+        current_date_utc = current_time_utc.date()
+        current_time_only = current_time_utc.time()  # <-- offset-naive time object
 
         # Словарь для отслеживания ближайшего предстоящего окна для каждого (название, карта)
         next_upcoming_for_location = {}
@@ -59,21 +59,26 @@ def get_arc_raiders_events_from_api_calculated():
 
                 try:
                     # Парсим время из строки "HH:MM" в объект time
-                    start_time = datetime.strptime(start_str, '%H:%M').time()
-                    end_time = datetime.strptime(end_str, '%H:%M').time()
+                    start_time = datetime.strptime(start_str, '%H:%M').time() # <-- offset-naive time object
+                    end_time = datetime.strptime(end_str, '%H:%M').time()     # <-- offset-naive time object
 
                     # --- Вычисление активности ---
                     # Случай 1: start и end в один день (например, 01:00 - 02:00)
                     if start_time <= end_time:
                         if start_time <= current_time_only < end_time:
                             # Событие активно сегодня
-                            # Вычисляем время окончания как datetime объект (на сегодня)
-                            end_datetime = datetime.combine(current_time_utc.date(), end_time)
+                            # Вычисляем время окончания как datetime объект (на сегодня, в UTC)
+                            # datetime.combine создает offset-naive datetime, нужно сделать его aware
+                            end_datetime_naive = datetime.combine(current_date_utc, end_time)
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+
                             # Если end_datetime <= current_time_utc (например, из-за секунд/миллисекунд), добавляем день
                             if end_datetime <= current_time_utc:
-                                end_datetime = datetime.combine(current_time_utc.date() + timedelta(days=1), end_time)
+                                logger.warning(f"End time {end_datetime} is <= current time {current_time_utc}, adding 1 day.")
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
+                                end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc)
 
-                            time_left = end_datetime - current_time_utc
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
                             total_seconds = int(time_left.total_seconds())
                             hours, remainder = divmod(total_seconds, 3600)
                             minutes, seconds = divmod(remainder, 60)
@@ -100,11 +105,12 @@ def get_arc_raiders_events_from_api_calculated():
                             # Вычисляем время окончания
                             # Если текущее время >= start_time, значит событие началось сегодня и закончится завтра
                             if current_time_only >= start_time:
-                                end_datetime = datetime.combine(current_time_utc.date() + timedelta(days=1), end_time)
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
                             else: # current_time_only < end_time -> событие началось вчера и заканчивается сегодня
-                                end_datetime = datetime.combine(current_time_utc.date(), end_time)
+                                end_datetime_naive = datetime.combine(current_date_utc, end_time)
 
-                            time_left = end_datetime - current_time_utc
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
                             total_seconds = int(time_left.total_seconds())
                             hours, remainder = divmod(total_seconds, 3600)
                             minutes, seconds = divmod(remainder, 60)
@@ -129,17 +135,20 @@ def get_arc_raiders_events_from_api_calculated():
                     # Случай 1: start и end в один день (например, 01:00 - 02:00)
                     if start_time <= end_time:
                         if start_time > current_time_only: # Начнётся сегодня
-                            start_datetime = datetime.combine(current_time_utc.date(), start_time)
+                            start_datetime_naive = datetime.combine(current_date_utc, start_time)
                         else: # Началось сегодня, но уже прошло, ищем на завтра
-                            start_datetime = datetime.combine(current_time_utc.date() + timedelta(days=1), start_time)
+                            start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
                     # Случай 2: start > end (например, 23:00 - 01:00)
                     else: # start_time > end_time
                         if current_time_only < start_time and current_time_only >= end_time: # Событие еще не началось сегодня (например, 22:00, а старт в 23:00)
-                            start_datetime = datetime.combine(current_time_utc.date(), start_time)
+                            start_datetime_naive = datetime.combine(current_date_utc, start_time)
                         else: # Событие уже прошло сегодня, ищем на завтра или позже
-                            start_datetime = datetime.combine(current_time_utc.date() + timedelta(days=1), start_time)
+                            start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
 
-                    time_to_start = start_datetime - current_time_utc
+                    # Сделать start_datetime aware
+                    start_datetime = start_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+
+                    time_to_start = start_datetime - current_time_utc # <-- Теперь оба aware
                     total_seconds = int(time_to_start.total_seconds())
                     hours, remainder = divmod(total_seconds, 3600)
                     minutes, seconds = divmod(remainder, 60)
@@ -154,7 +163,7 @@ def get_arc_raiders_events_from_api_calculated():
                     if key not in next_upcoming_for_location or start_datetime < next_upcoming_for_location[key]['start_time']:
                         next_upcoming_for_location[key] = {
                             'time_left': time_to_start_str,
-                            'start_time': start_datetime
+                            'start_time': start_datetime # <-- Убедиться, что это aware
                         }
                         logger.info(f"Найдено предстоящее событие для {name} на {location}, начнётся через {time_to_start_str} ({start_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')})")
 
@@ -167,10 +176,11 @@ def get_arc_raiders_events_from_api_calculated():
                  'name': name,
                  'location': location,
                  'time_left': event_info['time_left'],
-                 'start_time': event_info['start_time']
+                 'start_time': event_info['start_time'] # <-- Должно быть aware
              })
 
         # Сортируем предстоящие события по времени начала
+        # Сортировка будет корректной, так как start_time теперь aware
         upcoming_events.sort(key=lambda x: x['start_time'])
 
         logger.info(f"Вычисление по API завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
