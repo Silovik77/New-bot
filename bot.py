@@ -270,13 +270,14 @@ async def process_callback_events(callback_query: types.CallbackQuery):
 async def send_events_message(message: types.Message, edit: bool = False):
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
-
-
+    # Форматируем активные события
     active_message = format_event_message(active, "active")
-    upcoming_message = format_event_message(limited_upcoming, "upcoming")
+    # Форматируем ВСЕ предстоящие события (без ограничения)
+    upcoming_message = format_event_message(upcoming, "upcoming")
 
+    # Объединяем сообщения
     response_text = active_message
-    if limited_upcoming:
+    if upcoming: # Добавляем предстоящие, только если они есть
         response_text += "\n" + upcoming_message
 
     # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
@@ -322,7 +323,7 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
     await cmd_start(callback_query.message)
     await callback_query.answer()
 
-# --- Форматирование сообщения с переводом, ограничением и эмодзи ---
+# --- Форматирование сообщения с переводом, без ограничения и с эмодзи ---
 def format_event_message(events, event_type="active"):
     """Форматирует список событий в текстовое сообщение с переводом и эмодзи."""
     if not events:
@@ -348,7 +349,7 @@ def format_event_message(events, event_type="active"):
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API, кнопками ссылок, текстом об обновлении и редактированием сообщений...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
@@ -356,4 +357,5 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Бот остановлен пользователем.")
+
 
