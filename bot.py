@@ -97,13 +97,12 @@ SCHEDULE = [
     (11, "Night Raid", "Stella Montis"),
 
     (12, "Harvester", "Dam"),
-    (12, "Night Raid", "Buried City"),
+    (12, "Night Raid", "Stella Montis"),
     (12, "Prospecting Probes", "Spaceport"),
     (12, "Lush Blooms", "Blue Gate"),
 
-    (13, "Husk Graveyard", "Dam"),
-    (13, "Hidden Bunker", "Spaceport"),
-    (13, "Night Raid", "Blue Gate"),
+    (13, "Night Raid", "Dam"),
+    (13, "Night Raid", "Spaceport"),
 
     (14, "Electromagnetic Storm", "Dam"),
     (14, "Prospecting Probes", "Buried City"),
