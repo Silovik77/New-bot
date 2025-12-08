@@ -26,10 +26,10 @@ dp = Dispatcher(storage=storage)
 # --- Словари перевода ---
 EVENT_TRANSLATIONS = {
     "Electromagnetic Storm": "Электромагнитная буря",
-    "Harvester": "Жнец",
-    "Lush Blooms": "Цветущие заросли",
+    "Harvester": "Сборщик",
+    "Lush Blooms": "Повышенная растительность",
     "Matriarch": "Матриарх",
-    "Night Raid": "Ночной налёт",
+    "Night Raid": "Ночной рейд",
     "Uncovered Caches": "Обнаруженные тайники",
     "Launch Tower Loot": "Добыча с пусковой башни",
     "Hidden Bunker": "Скрытый бункер", # Добавлено из HTML
@@ -39,7 +39,7 @@ EVENT_TRANSLATIONS = {
 
 MAP_TRANSLATIONS = {
     "Dam": "Плотина",
-    "Buried City": "Закопанный город",
+    "Buried City": "Погребенный город",
     "Spaceport": "Космопорт",
     "Blue Gate": "Синие врата",
     "Stella Montis": "Стелла Монти",
@@ -47,9 +47,9 @@ MAP_TRANSLATIONS = {
 
 # --- Ссылки для кнопок ---
 LINKS = {
-    "streams": "https://www.twitch.tv/directory/game/ARC%20Raider",
-    "telegram": "https://t.me/arcraiders", # Пример, замените на реальную ссылку
-    "support": "https://www.arcraiders.com/support", # Пример, замените на реальную ссылку
+    "streams": "https://www.twitch.tv/silovik_",
+    "telegram": "https://t.me/silovik_stream", # Пример, замените на реальную ссылку
+    "support": "https://dalink.to/silovik_", # Пример, замените на реальную ссылку
     "update": "https://www.arcraiders.com/patch-notes", # Пример, замените на реальную ссылку
 }
 
@@ -274,8 +274,16 @@ async def send_events_message(message: types.Message):
     # Вызываем функцию получения данных из API с вычислением
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
-    response_text = format_event_message(active, "active")
-    response_text += "\n" + format_event_message(upcoming, "upcoming")
+    # Форматируем активные события
+    active_message = format_event_message(active, "active")
+    # Форматируем ограниченное количество предстоящих событий (например, первые 6)
+    limited_upcoming = upcoming[:6]
+    upcoming_message = format_event_message(limited_upcoming, "upcoming")
+
+    # Объединяем сообщения
+    response_text = active_message
+    if limited_upcoming: # Добавляем предстоящие, только если они есть
+        response_text += "\n" + upcoming_message
 
     # Клавиатура с кнопками "Обновить" и "Назад"
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
@@ -285,13 +293,17 @@ async def send_events_message(message: types.Message):
 
     await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
 
-# --- Форматирование сообщения с переводом ---
+# --- Форматирование сообщения с переводом и ограничением ---
 def format_event_message(events, event_type="active"):
     """Форматирует список событий в текстовое сообщение с переводом."""
     if not events:
-        return f"Нет {'активных' if event_type == 'active' else 'предстоящих'} событий.\n"
+        # Если список пуст, возвращаем пустую строку или сообщение, только если это активные
+        if event_type == "active":
+             return f"Нет активных событий.\n"
+        else: # Для предстоящих, если список пуст, просто не выводим заголовок
+             return "" # или f"Нет предстоящих событий в ближайшее время.\n" если нужно сообщение
 
-    header = "Активные события:\n" if event_type == "active" else "Предстоящие события:\n"
+    header = "🟢Активные события:\n" if event_type == "active" else "🔴Предстоящие события:\n"
     message = header
     for event in events:
         # Получаем перевод или оставляем оригинальное имя, если перевод не найден
