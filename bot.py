@@ -238,43 +238,107 @@ def get_arc_raiders_events_from_api_calculated():
         return [], []
 
 # --- Обработчики команд и кнопок ---
-# (Код обработчиков остаётся без изменений, меняется только функция получения данных)
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    """Отправляет приветственное сообщение с основными кнопками."""
+    # Клавиатура с кнопками "События", "Ссылки" и "Обновление игры" в главном меню
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")]
+        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
+        [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
+        [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
+        [types.InlineKeyboardButton(text="🆘 Поддержка", url=LINKS["support"])],
+        [types.InlineKeyboardButton(text="🆕 Обновление игры", callback_data="game_update_text")]
     ])
     await message.answer(
-        f"Привет, {message.from_user.first_name}! Нажми кнопку ниже, чтобы посмотреть активные и предстоящие события в ARC Raiders.",
+        f"Привет, {message.from_user.first_name}! Выбери действие:",
         reply_markup=keyboard
     )
 
-@dp.callback_query(lambda c: c.data == 'events')
-async def process_callback_events(callback_query: types.CallbackQuery):
-    await send_events_message(callback_query.message)
+# Обработчик для обновления игры
+@dp.callback_query(lambda c: c.data == 'game_update_text')
+async def process_callback_game_update(callback_query: types.CallbackQuery):
+    await callback_query.message.answer(GAME_UPDATE_TEXT, parse_mode='Markdown')
     await callback_query.answer()
 
-async def send_events_message(message: types.Message):
-    # Вызываем НОВУЮ функцию получения данных из API с вычислением
+# Обработчик для событий
+@dp.callback_query(lambda c: c.data == 'events')
+async def process_callback_events(callback_query: types.CallbackQuery):
+    await send_events_message(callback_query.message, edit=False) # Отправляем новое сообщение
+    await callback_query.answer()
+
+# Функция отправки или редактирования сообщения с событиями
+async def send_events_message(message: types.Message, edit: bool = False):
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
-    response_text = format_event_message(active, "active")
-    response_text += "\n" + format_event_message(upcoming, "upcoming")
+    # Фильтруем предстоящие события по временному лимиту (например, 24 часа)
+    current_time = datetime.now(timezone.utc)
+    time_limit = current_time + timedelta(hours=24)
+    filtered_upcoming = [event for event in upcoming if event['start_time'] <= time_limit]
+    limited_upcoming = filtered_upcoming[:6] # Берём первые 6 из отфильтрованных
 
+    active_message = format_event_message(active, "active")
+    upcoming_message = format_event_message(limited_upcoming, "upcoming")
+
+    response_text = active_message
+    if limited_upcoming:
+        response_text += "\n" + upcoming_message
+
+    # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="events")]
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")], # Изменили callback
+        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="start_menu")]
     ])
 
-    await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
+    if edit:
+        # Пытаемся отредактировать существующее сообщение
+        try:
+            await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='Markdown')
+            logger.info("Сообщение с событиями отредактировано.")
+        except Exception as e:
+            # Если не получилось отредактировать (например, сообщение слишком старое), отправим новое
+            logger.warning(f"Не удалось отредактировать сообщение: {e}. Отправляем новое.")
+            await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
+    else:
+        # Отправляем новое сообщение
+        await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
 
-# --- Форматирование сообщения с переводом ---
+# Новый обработчик для обновления (редактирования) сообщения с событиями
+@dp.callback_query(lambda c: c.data == 'refresh_events')
+async def process_callback_refresh_events(callback_query: types.CallbackQuery):
+    # Вызываем send_events_message с edit=True
+    await send_events_message(callback_query.message, edit=True)
+    # ВАЖНО: НЕ вызываем callback_query.answer() сразу, потому что edit_text может занять время
+    # aiogram сам вызовет answer, если edit_text прошёл успешно.
+    # Если edit_text не удался и было отправлено новое сообщение, answer нужно вызвать вручную.
+    # Проверим, было ли сообщение отредактировано или отправлено новое.
+    # Проще всего всегда вызвать answer, если edit_text не вызвал исключения.
+    # Но если edit_text вызвал исключение и было отправлено новое сообщение,
+    # то answer вызовет ошибку, так как callback уже "истек".
+    # Обернём в try-except, чтобы избежать ошибки в последнем случае.
+    try:
+        await callback_query.answer()
+    except Exception:
+        pass # Игнорируем ошибку, если answer не нужен/невозможен
+
+# Обработчик для кнопки "Назад" из меню событий
+@dp.callback_query(lambda c: c.data == 'start_menu')
+async def process_callback_back_to_start(callback_query: types.CallbackQuery):
+    await cmd_start(callback_query.message)
+    await callback_query.answer()
+
+# --- Форматирование сообщения с переводом, ограничением и эмодзи ---
 def format_event_message(events, event_type="active"):
-    """Форматирует список событий в текстовое сообщение с переводом."""
+    """Форматирует список событий в текстовое сообщение с переводом и эмодзи."""
     if not events:
-        return f"Нет {'активных' if event_type == 'active' else 'предстоящих'} событий.\n"
+        # Если список пуст, возвращаем пустую строку или сообщение, только если это активные
+        if event_type == "active":
+             return f"Нет активных событий.\n"
+        else: # Для предстоящих, если список пуст, просто не выводим заголовок
+             return "" # или f"Нет предстоящих событий в ближайшее время.\n" если нужно сообщение
 
-    header = "Активные события:\n" if event_type == "active" else "Предстоящие события:\n"
+    # Выбираем заголовок с эмодзи
+    header = "🟢 Активные события:\n" if event_type == "active" else "🔴 Предстоящие события:\n"
     message = header
     for event in events:
         # Получаем перевод или оставляем оригинальное имя, если перевод не найден
@@ -289,7 +353,7 @@ def format_event_message(events, event_type="active"):
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API, кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
@@ -297,6 +361,5 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Бот остановлен пользователем.")
-
 
 
