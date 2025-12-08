@@ -270,11 +270,7 @@ async def process_callback_events(callback_query: types.CallbackQuery):
 async def send_events_message(message: types.Message, edit: bool = False):
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
-    # Фильтруем предстоящие события по временному лимиту (например, 24 часа)
-    current_time = datetime.now(timezone.utc)
-    time_limit = current_time + timedelta(hours=1)
-    filtered_upcoming = [event for event in upcoming if event['start_time'] <= time_limit]
-    limited_upcoming = filtered_upcoming[:6] # Берём первые 6 из отфильтрованных
+
 
     active_message = format_event_message(active, "active")
     upcoming_message = format_event_message(limited_upcoming, "upcoming")
