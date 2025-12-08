@@ -50,7 +50,7 @@ LINKS = {
     "streams": "https://www.twitch.tv/silovik_",
     "telegram": "https://t.me/silovik_stream", # Пример, замените на реальную ссылку
     "support": "https://dalink.to/silovik_", # Пример, замените на реальную ссылку
-    "update": "https://www.arcraiders.com/patch-notes", # Пример, замените на реальную ссылку
+
 }
 
 # --- Текст для обновления игры ---
@@ -240,75 +240,61 @@ def get_arc_raiders_events_from_api_calculated():
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    """Отправляет приветственное сообщение с кнопками."""
-    # Основная клавиатура с кнопками "События" и "Ссылки"
+    """Отправляет приветственное сообщение с основными кнопками."""
+    # Клавиатура с кнопками "События", "Ссылки" и "Обновление игры" в главном меню
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
-        [types.InlineKeyboardButton(text="Ссылки и Информация", callback_data="links_menu")]
+        [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
+        [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
+        [types.InlineKeyboardButton(text="🆘 Поддержка", url=LINKS["support"])],
+        [types.InlineKeyboardButton(text="🆕 Обновление игры", callback_data="game_update_text")]
     ])
     await message.answer(
         f"Привет, {message.from_user.first_name}! Выбери действие:",
         reply_markup=keyboard
     )
 
-@dp.message(Command("links"))
-async def cmd_links(message: types.Message):
-    """Отправляет сообщение с кнопками ссылок."""
-    await send_links_menu(message)
+# Обработчик для обновления игры
+@dp.callback_query(lambda c: c.data == 'game_update_text')
+async def process_callback_game_update(callback_query: types.CallbackQuery):
+    await callback_query.message.answer(GAME_UPDATE_TEXT, parse_mode='Markdown')
+    await callback_query.answer()
 
-async def send_links_menu(message: types.Message):
-    """Отправляет сообщение с кнопками ссылок."""
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
-        [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
-        [types.InlineKeyboardButton(text="🆘 Поддержка", url=LINKS["support"])],
-        [types.InlineKeyboardButton(text="🆕 Обновление игры", url=LINKS["update"])],
-        # Кнопка "Назад" для возврата в главное меню
-        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
-    ])
-    await message.answer("Выбери нужную ссылку:", reply_markup=keyboard)
-
+# Обработчик для событий
 @dp.callback_query(lambda c: c.data == 'events')
 async def process_callback_events(callback_query: types.CallbackQuery):
     await send_events_message(callback_query.message)
     await callback_query.answer()
 
-@dp.callback_query(lambda c: c.data == 'links_menu')
-async def process_callback_links_menu(callback_query: types.CallbackQuery):
-    await send_links_menu(callback_query.message)
-    await callback_query.answer()
-
-@dp.callback_query(lambda c: c.data == 'back_to_main')
-async def process_callback_back_to_main(callback_query: types.CallbackQuery):
-    await cmd_start(callback_query.message)
-    await callback_query.answer()
-
+# Функция отправки сообщения с событиями
 async def send_events_message(message: types.Message):
-    # Вызываем функцию получения данных из API с вычислением
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
-    # Форматируем активные события
     active_message = format_event_message(active, "active")
-    # Форматируем ограниченное количество предстоящих событий (например, первые 6)
     limited_upcoming = upcoming[:6]
     upcoming_message = format_event_message(limited_upcoming, "upcoming")
 
-    # Объединяем сообщения
     response_text = active_message
-    if limited_upcoming: # Добавляем предстоящие, только если они есть
+    if limited_upcoming:
         response_text += "\n" + upcoming_message
 
-    # Клавиатура с кнопками "Обновить" и "Назад"
+    # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="events")],
-        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
+        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="start_menu")] # Используем новый callback
     ])
 
     await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
 
-# --- Форматирование сообщения с переводом и ограничением ---
+# Новый обработчик для кнопки "Назад" из меню событий
+@dp.callback_query(lambda c: c.data == 'start_menu')
+async def process_callback_back_to_start(callback_query: types.CallbackQuery):
+    await cmd_start(callback_query.message)
+    await callback_query.answer()
+
+# --- Форматирование сообщения с переводом, ограничением и эмодзи ---
 def format_event_message(events, event_type="active"):
-    """Форматирует список событий в текстовое сообщение с переводом."""
+    """Форматирует список событий в текстовое сообщение с переводом и эмодзи."""
     if not events:
         # Если список пуст, возвращаем пустую строку или сообщение, только если это активные
         if event_type == "active":
@@ -316,7 +302,8 @@ def format_event_message(events, event_type="active"):
         else: # Для предстоящих, если список пуст, просто не выводим заголовок
              return "" # или f"Нет предстоящих событий в ближайшее время.\n" если нужно сообщение
 
-    header = "🟢Активные события:\n" if event_type == "active" else "🔴Предстоящие события:\n"
+    # Выбираем заголовок с эмодзи
+    header = "🟢 Активные события:\n" if event_type == "active" else "🔴 Предстоящие события:\n"
     message = header
     for event in events:
         # Получаем перевод или оставляем оригинальное имя, если перевод не найден
@@ -331,7 +318,7 @@ def format_event_message(events, event_type="active"):
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API и кнопками ссылок...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API, кнопками ссылок и текстом об обновлении...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
@@ -339,3 +326,4 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Бот остановлен пользователем.")
+
