@@ -1,315 +1,206 @@
 import asyncio
 import logging
-import os
-from datetime import datetime, timezone, timedelta
-from aiogram import Bot, Dispatcher, Router
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
+from datetime import datetime, timezone
+import requests
+from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.fsm.storage.memory import MemoryStorage
 
-# === НАСТРОЙКИ ===
+# --- Настройки ---
+# Вставьте сюда токен вашего Telegram-бота
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
-STREAM_URL = "https://www.twitch.tv/silovik_"
-CHANNEL_URL = "https://t.me/silovik_stream"
-SUPPORT_URL = "https://dalink.to/silovik_"
+EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
 
-# === ПЕРЕВОДЫ ===
-EVENTS_RU = {
-    "Lush Blooms": "Пышное Цветение",
-    "Matriarch": "Матриарх",
-    "Night Raid": "Ночной Рейд",
-    "Uncovered Caches": "Обнаруженные Тайники",
-    "Electromagnetic Storm": "Электромагнитная Буря",
-    "Harvester": "Сборщик(Королева)",
-    "Husk Graveyard": "Кладбище Хасков",
-    "Launch Tower Loot": "Добыча с Пусковой Башни",
-    "Prospecting Probes": "Разведывательные Зонды",
-}
+# --- Настройка логирования ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-MAPS_RU = {
-    "Blue Gate": "Синие Врата",
-    "Dam": "Плотина",
-    "Spaceport": "Космопорт",
-    "Buried City": "Погребённый Город",
-    "Stella Montis": "Стелла Монтиc",
-}
-
-def tr_event(name): return EVENTS_RU.get(name, name)
-def tr_map(name): return MAPS_RU.get(name, name)
-
-# === РАСПИСАНИЕ (время в Москве — UTC+3) ===
-SCHEDULE = [
-    # (час_начала_мск, событие, карта)
-
-
-
-
-    (0, "Night Raid", "Buried City"),
-    (0, "Matriarch", "Spaceport"),
-
-    (1,"Electromagnetic Storm", "Blue Gate"),
-    (1,"Night Raid", "Stella Montis"),
-    (1,"Night Raid", "Spaceport"),
-
-    (2, "Prospecting Probes", "Buried City"),
-    (2, "Uncovered Caches", "Dam"),
-    (2, "Night Raid", "Stella Montis"),
-    (2, "Electromagnetic Storm", "Dam"),
-    (2, "Matriarch", "Blue Gate"),
-
-    (3, "Matriarch", "Dam"),
-    (3, "Night Raid", "Buried City"),
-    (3, "Harvester", "Spaceport"),
-
-    (4, "Night Raid", "Spaceport"),
-
-    (5, "Night Raid", "Dam"),
-    (5, "Night Raid", "Stella Montis"),
-    (5, "Uncovered Caches", "Buried City"),
-    (5, "Husk Graveyard", "Blue Gate"),
-
-
-    (6, "Lush Blooms", "Dam"),
-    (6, "Night Raid", "Buried City"),
-    (6, "Matriarch", "Spaceport"),
-
-    (7, "Electromagnetic Storm", "Spaceport"),
-    (7, "Night Raid", "Blue Gate"),
-
-    (8, "Electromagnetic Storm", "Dam"),
-    (8, "Husk Graveyard", "Buried City"),
-    (8, "Harvester", "Blue Gate"),
-    (8, "Night Raid", "Stella Montis"),
-
-    (9, "Launch Tower Loot", "Spaceport"),
-    (9, "Prospecting Probes", "Dam"),
-    (9, "Night Raid", "Buried City"),
-
-    (10, "Electromagnetic Storm", "Blue Gate"),
-    (10, "Night Raid", "Spaceport"),
-
-    (11, "Night Raid", "Dam"),
-    (11, "Lush Blooms", "Buried City"),
-    (11, "Prospecting Probes", "Blue Gate"),
-    (11, "Night Raid", "Stella Montis"),
-
-    (12, "Harvester", "Dam"),
-    (12, "Night Raid", "Stella Montis"),
-    (12, "Prospecting Probes", "Spaceport"),
-    (12, "Lush Blooms", "Blue Gate"),
-
-    (13, "Night Raid", "Dam"),
-    (13, "Night Raid", "Spaceport"),
-
-    (14, "Lush Blooms", "Spaceport"),
-    (14, "Night Raid", "Buried City"),
-    (14, "Harvester", "Blue Gate"),
-
-
-    (15, "Uncovered Caches", "Buried City"),
-    (15, "Night Raid", "Blue Gate"),
-
-    (16, "Matriarch", "Dam"),
-    (16, "Electromagnetic Storm", "Spaceport"),
-
-
-    (17, "Electromagnetic Storm", "Dam"),
-    (17, "Matriarch", "Blue Gate"),
-    (17, "Night Raid", "Stella Montis"),
-
-    (18, "Night Raid", "Buried City"),
-    (18, "Electromagnetic Storm", "Blue Gate"),
-    (18, "Launch Tower Loot", "Spaceport"),
-
-    (19, "Night Raid", "Spaceport"),
-    (19, "Lush Blooms", "Buried City"),
-    (19, "Night Raid", "Stella Montis"),
-
-
-    (20, "Electromagnetic Storm", "Dam"),
-    (20, "Lush Blooms", "Dam"),
-
-
-    (21, "Night Raid", "Buried City"),
-    (21, "Harvester", "Spaceport"),
-    (21, "Husk Graveyard", "Blue Gate"),
-
-    (22, "Hidden Bunker", "Spaceport"),
-    (22, "Night Raid", "Blue Gate"),
-    (22, "Husk Graveyard", "Blue Gate"),
-
-    (23, "Matriarch", "Dam"),
-    (23, "Uncovered Caches", "Buried City"),
-    (23, "Lush Blooms", "Blue Gate"),
-
-]
-
-def get_current_events():
-    # Московское время (UTC+3)
-    moscow_tz = timezone(timedelta(hours=3))
-    now = datetime.now(moscow_tz)
-    current_hour = now.hour
-    minutes = now.minute
-    seconds = now.second
-    total_sec = minutes * 60 + seconds
-
-    active = []
-    upcoming = []
-
-    # === АКТИВНЫЕ СОБЫТИЯ (в этом часу по Москве) ===
-    for hour, event, loc in SCHEDULE:
-        if hour == current_hour and total_sec < 3600:
-            time_left = 3600 - total_sec
-            mins, secs = divmod(time_left, 60)
-            active.append({
-                'name': event,
-                'location': loc,
-                'info': f"Заканчивается через {int(mins)}m {int(secs)}s",
-                'time': f"({hour}:00–{hour + 1}:00 МСК)"
-            })
-
-    # === ПРЕДСТОЯЩИЕ СОБЫТИЯ (в следующем часу по Москве) ===
-    next_hour = (current_hour + 1) % 24
-    for hour, event, loc in SCHEDULE:
-        if hour == next_hour:
-            time_until = 3600 - total_sec
-            mins, secs = divmod(time_until, 60)
-            upcoming.append({
-                'name': event,
-                'location': loc,
-                'info': f"Начнётся через {int(mins)}m {int(secs)}s",
-                'time': f"({next_hour}:00–{next_hour + 1}:00 МСК)"
-            })
-
-    return active, upcoming
-
-# === ОБНОВЛЕНИЯ ИГРЫ ===
-GAME_UPDATES = """
-🎮 <b>ARC Raiders — Последние обновления</b>
-
-
-
-🔧 <b>Информация по Экспедиции</b>
-• Экспедиция немного задержалась, и доступ откроется 17 декабря. У вас будет шестидневный период, в течение которого ваш Рейдер сможет навсегда покинуть Ржавый Пояс. Отправившись в Караване, который вы построили в Проекте Экспедиции, вы начнёте своё путешествие заново с определёнными баффами. Мы хотим рассказать вам о некоторых из них.
-Когда вы отправитесь в экспедицию, все предметы из тайника вашего рейдера будут переданы в ее распоряжение. Ваш следующий рейдер может заработать до пяти очков навыков в зависимости от общей стоимости вашего тайника и монет на момент отправления. Стоимость одного миллиона монет равна одному дополнительному очку навыка для вашего нового рейдера.
-При вайпе все, что связано с вашим прогрессом, будет сброшено. Это означает, что ваше дерево навыков, уровень, тайник, мастерская, способности к крафту и чертежи. Стоит уточнить, что все карты и возможные улучшения в мастерской будут доступны сразу после вайпа.
-Ваш новый рейдер не будет полностью перезапущен с самого начала. Сбросив настройки, вы получите следующие преимущества и награды:
-
-Постоянные награды:
-Скин "Латочник"
-•Потрепанная кепка Плюшкина
-•Значок индикатора экспедиций
-•Очки умений (в зависимости от стоимости хранилища)
-•+12 места в тайнике
-
-Временные бонусы:
-•10% бонус к ремонту
-•5% бонус к опыту
-•На 6% больше материалов у Плюшкина
-
-Хотя очки умений, дополнительное место в тайнике и косметика доступны постоянно, срок действия улучшений аккаунта истечет, если вы решите не отправляться в следующую экспедицию. Имейте в виду, что в течение следующих трех экспедиций количество баффов увеличится (но в течение каждого периода экспедиции разрешается только один выход!).
-Помните, что период проведения экспедиции будет открыт с 17 декабря и продлится до 22 декабря. Вы должны зарегистрироваться в течение этого периода, и все участники автоматически отправятся в одно и то же время 22-го числа.
-Стоимость вашего хранилища и монет будет подсчитана, когда закроется окно, поэтому не прекращайте лутаться до этого времени! Если вы решите не вайпать ваш аккаунт в этот раз, не волнуйтесь - ваш прогресс в строительстве фургона будет сохранен, так что вы сможете продолжать работать над ним до тех пор, пока через пару месяцев не откроется следующее окно.
-
-
-
-
-🔗 <b>Официальные ресурсы</b>
-• Сайт: https://arcreaiders.com  
-• Discord: https://discord.gg/arc-raiders
-"""
-
-# === TELEGRAM ===
+# --- Инициализация бота ---
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-router = Router()
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
 
-@router.message(Command("start"))
-async def start_handler(message: Message):
-    kb = InlineKeyboardBuilder()
-    kb.button(text="📅 События", callback_data="events")
-    kb.button(text="🆕 Обновления игры", callback_data="updates")
-    kb.button(text="📺 Мой стрим", url=STREAM_URL)
-    kb.button(text="📢 Мой канал", url=CHANNEL_URL)
-    kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
-    kb.adjust(2)
-    await message.answer("🎮 ARC Raiders: события (по расписанию)", reply_markup=kb.as_markup())
+# --- Функции для получения и обработки данных из API ---
 
-@router.callback_query(lambda c: c.data == "events")
-async def events_handler(callback: CallbackQuery):
-    await callback.answer()
-    active, upcoming = get_current_events()
+def get_arc_raiders_events_from_api():
+    """Получает события из API MetaForge и анализирует их структуру."""
+    try:
+        response = requests.get(EVENT_TIMERS_API_URL)
+        response.raise_for_status()
+        data = response.json()
 
-    if not active and not upcoming:
-        msg = " agosto Нет событий."
-    else:
-        parts = ["🎮 <b>ARC Raiders: События</b> (время в Москве, UTC+3)\n"]
-        if active:
-            parts.append("🟢 <b>Сейчас:</b>")
-            for e in active:
-                parts.append(f" • <b>{tr_event(e['name'])}</b> ({tr_map(e['location'])}) — {e['info']} {e['time']}")
-        if upcoming:
-            parts.append("\n⏳ <b>Скоро:</b>")
-            for e in upcoming[:30]:
-                parts.append(f" • <b>{tr_event(e['name'])}</b> ({tr_map(e['location'])}) — {e['info']} {e['time']}")
-        msg = "\n".join(parts)
-        if len(msg) > 4000:
-            msg = msg[:3990] + "\n\n... (список усечён)"
+        raw_events = data.get('data', [])
+        active_events = []
+        upcoming_events = []
 
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🔄 Обновить", callback_data="events")
-    kb.button(text="🆕 Обновления", callback_data="updates")
-    kb.button(text="📺 Стрим", url=STREAM_URL)
-    kb.button(text="📢 Канал", url=CHANNEL_URL)
-    kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
-    kb.button(text="⬅️ Назад", callback_data="start")
-    kb.adjust(2)
+        current_time = datetime.now(timezone.utc)
+        # Словарь для отслеживания ближайшего предстоящего окна для каждого события
+        next_upcoming_for_event = {}
 
-    current_text = callback.message.text or ""
-    current_markup = callback.message.reply_markup
-    new_markup = kb.as_markup()
-    if current_text != msg or current_markup != new_markup:
-        try:
-            await callback.message.edit_text(msg, parse_mode="HTML", reply_markup=new_markup)
-        except:
-            await callback.message.answer(msg, parse_mode="HTML", reply_markup=new_markup)
-    else:
-        await callback.answer("Данные не изменились.")
+        for event_obj in raw_events:
+            name = event_obj.get('name', 'Unknown Event')
+            # Обработка 'map' как массива (хотя на сайте может быть строка, API может нормализовать)
+            # В данном случае, мы будем использовать локации из 'windows', так как они точнее
+            # possible_maps = event_obj.get('map', [])
+            # if isinstance(possible_maps, str):
+            #      possible_maps = [possible_maps]
 
-@router.callback_query(lambda c: c.data == "updates")
-async def updates_handler(callback: CallbackQuery):
-    await callback.answer()
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🔄 Обновить", callback_data="updates")
-    kb.button(text="📺 Стрим", url=STREAM_URL)
-    kb.button(text="📢 Канал", url=CHANNEL_URL)
-    kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
-    kb.button(text="⬅️ Назад", callback_data="start")
-    kb.adjust(2)
+            times_info = event_obj.get('times', {})
+            windows = times_info.get('windows', [])
 
-    await callback.message.edit_text(GAME_UPDATES, parse_mode="HTML", reply_markup=kb.as_markup())
+            # Проходим по каждому окну события
+            for window in windows:
+                start_str = window.get('startTime')
+                end_str = window.get('endTime')
+                location = window.get('location', 'Unknown Location')
 
-@router.callback_query(lambda c: c.data == "start")
-async def back_to_menu(callback: CallbackQuery):
-    await callback.answer()
-    kb = InlineKeyboardBuilder()
-    kb.button(text="📅 События", callback_data="events")
-    kb.button(text="🆕 Обновления игры", callback_data="updates")
-    kb.button(text="📺 Мой стрим", url=STREAM_URL)
-    kb.button(text="📢 Мой канал", url=CHANNEL_URL)
-    kb.button(text="🛠 Поддержка", url=SUPPORT_URL)
-    kb.adjust(2)
-    await callback.message.edit_text("🎮 ARC Raiders: события (по расписанию из Excel)", reply_markup=kb.as_markup())
+                if not start_str or not end_str:
+                    logger.warning(f"Missing startTime or endTime for event {name} at {location}")
+                    continue
 
-dp.include_router(router)
+                try:
+                    start_time = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+                    end_time = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
 
+                    # Проверяем, активно ли окно *сейчас*
+                    if start_time <= current_time < end_time:
+                        time_left = end_time - current_time
+                        # Форматируем оставшееся время как строку (например, "1h 23m 45s")
+                        total_seconds = int(time_left.total_seconds())
+                        hours, remainder = divmod(total_seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        # time_left_str = f"{hours}h {minutes}m {seconds}s"
+                        # Убираем нули для красоты
+                        time_parts = []
+                        if hours > 0:
+                            time_parts.append(f"{hours}h")
+                        if minutes > 0:
+                            time_parts.append(f"{minutes}m")
+                        if seconds > 0 or not time_parts: # Показываем секунды, если это единственное значение или есть значение
+                            time_parts.append(f"{seconds}s")
+                        time_left_str = " ".join(time_parts)
+
+                        active_events.append({
+                            'name': name,
+                            'location': location,
+                            'time_left': time_left_str,
+                            'end_time': end_time
+                        })
+
+                    # Проверяем, предстоит ли окно
+                    elif start_time > current_time:
+                        time_to_start = start_time - current_time
+                        # Форматируем время до начала
+                        total_seconds = int(time_to_start.total_seconds())
+                        hours, remainder = divmod(total_seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        # time_to_start_str = f"{hours}h {minutes}m {seconds}s"
+                        # Убираем нули для красоты
+                        time_parts = []
+                        if hours > 0:
+                            time_parts.append(f"{hours}h")
+                        if minutes > 0:
+                            time_parts.append(f"{minutes}m")
+                        if seconds > 0 or not time_parts: # Показываем секунды, если это единственное значение или есть значение
+                            time_parts.append(f"{seconds}s")
+                        time_to_start_str = " ".join(time_parts)
+
+                        # Проверяем, является ли это окно ближайшим для данного события
+                        # Сравниваем с уже найденным ближайшим
+                        if name not in next_upcoming_for_event or start_time < next_upcoming_for_event[name]['start_time']:
+                            next_upcoming_for_event[name] = {
+                                'location': location,
+                                'time_left': time_to_start_str,
+                                'start_time': start_time
+                            }
+                except ValueError as e:
+                    logger.error(f"Error parsing time for event {name}: {start_str}, {end_str}. Error: {e}")
+
+        # После обработки всех окон, добавляем ближайшие предстоящие события
+        # из словаря next_upcoming_for_event в список upcoming_events
+        for name, event_info in next_upcoming_for_event.items():
+             upcoming_events.append({
+                 'name': name,
+                 'location': event_info['location'],
+                 'time_left': event_info['time_left'],
+                 'start_time': event_info['start_time']
+             })
+
+        # Сортируем предстоящие события по времени начала
+        upcoming_events.sort(key=lambda x: x['start_time'])
+
+        # Логируем результаты для отладки
+        logger.info(f"Found {len(active_events)} active events, {len(upcoming_events)} upcoming events.")
+        return active_events, upcoming_events
+
+    except requests.RequestException as e:
+        logger.error(f"Ошибка при получении данных из API: {e}")
+        return [], []
+    except Exception as e:
+        logger.error(f"Ошибка при обработке данных из API: {e}")
+        return [], []
+
+# --- Обработчики команд и кнопок ---
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    """Отправляет приветственное сообщение с кнопкой."""
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")]
+    ])
+    await message.answer(
+        f"Привет, {message.from_user.first_name}! Нажми кнопку ниже, чтобы посмотреть активные и предстоящие события в ARC Raiders.",
+        reply_markup=keyboard
+    )
+
+@dp.callback_query(lambda c: c.data == 'events')
+async def process_callback_events(callback_query: types.CallbackQuery):
+    """Обрабатывает нажатие кнопки 'События'."""
+    await send_events_message(callback_query.message)
+    await callback_query.answer() # Убирает "часики" у кнопки
+
+async def send_events_message(message: types.Message):
+    """Отправляет сообщение с событиями."""
+    # Вызываем функцию получения данных из API
+    active, upcoming = get_arc_raiders_events_from_api()
+
+    response_text = format_event_message(active, "active")
+    response_text += "\n" + format_event_message(upcoming, "upcoming")
+
+    # Клавиатура с кнопкой "Обновить"
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="events")]
+    ])
+
+    await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
+
+# --- Форматирование сообщения ---
+def format_event_message(events, event_type="active"):
+    """Форматирует список событий в текстовое сообщение."""
+    if not events:
+        return f"Нет {'активных' if event_type == 'active' else 'предстоящих'} событий.\n"
+
+    header = "Активные события:\n" if event_type == "active" else "Предстоящие события:\n"
+    message = header
+    for event in events:
+        if event_type == "active":
+            # time_left_str уже вычислено в get_arc_raiders_events_from_api
+            message += f"- **{event['name']}** на карте **{event['location']}** (осталось: {event['time_left']})\n"
+        else:
+            # time_left_str уже вычислено в get_arc_raiders_events_from_api
+            message += f"- **{event['name']}** на карте **{event['location']}** (начнётся через: {event['time_left']})\n"
+    return message
+
+# --- Основная функция запуска ---
 async def main():
-    logging.basicConfig(level=logging.INFO)
-    print("✅ ARC Raiders Telegram-бот запущен (с кнопкой 'Назад')")
+    logger.info("Запуск бота с использованием API...")
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен пользователем.")
