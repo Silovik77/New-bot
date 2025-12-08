@@ -80,7 +80,7 @@ def get_arc_raiders_events_from_api_calculated():
         active_events = []
         upcoming_events = []
 
-        current_time_utc = datetime.now(timezone.utc)  # <-- offset-aware
+        current_time_utc = datetime.now(timezone.utc) # <-- offset-aware
         current_date_utc = current_time_utc.date()
         current_time_only = current_time_utc.time()  # <-- offset-naive time object
 
@@ -94,8 +94,8 @@ def get_arc_raiders_events_from_api_calculated():
 
             # Проходим по каждому временному окну события на этой карте
             for time_window in times_list:
-                start_str = time_window.get('start')  # Например, "01:00"
-                end_str = time_window.get('end')  # Например, "02:00"
+                start_str = time_window.get('start') # Например, "01:00"
+                end_str = time_window.get('end')     # Например, "02:00"
 
                 if not start_str or not end_str:
                     logger.warning(f"Missing start or end time for event {name} at {location}")
@@ -103,8 +103,8 @@ def get_arc_raiders_events_from_api_calculated():
 
                 try:
                     # Парсим время из строки "HH:MM" в объект time
-                    start_time = datetime.strptime(start_str, '%H:%M').time()  # <-- offset-naive time object
-                    end_time = datetime.strptime(end_str, '%H:%M').time()  # <-- offset-naive time object
+                    start_time = datetime.strptime(start_str, '%H:%M').time() # <-- offset-naive time object
+                    end_time = datetime.strptime(end_str, '%H:%M').time()     # <-- offset-naive time object
 
                     # --- Вычисление активности ---
                     # Случай 1: start и end в один день (например, 01:00 - 02:00)
@@ -114,16 +114,15 @@ def get_arc_raiders_events_from_api_calculated():
                             # Вычисляем время окончания как datetime объект (на сегодня, в UTC)
                             # datetime.combine создает offset-naive datetime, нужно сделать его aware
                             end_datetime_naive = datetime.combine(current_date_utc, end_time)
-                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc)  # <-- offset-aware
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
 
                             # Если end_datetime <= current_time_utc (например, из-за секунд/миллисекунд), добавляем день
                             if end_datetime <= current_time_utc:
-                                logger.warning(
-                                    f"End time {end_datetime} is <= current time {current_time_utc}, adding 1 day.")
+                                logger.warning(f"End time {end_datetime} is <= current time {current_time_utc}, adding 1 day.")
                                 end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
                                 end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc)
 
-                            time_left = end_datetime - current_time_utc  # <-- Теперь оба aware
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
                             total_seconds = int(time_left.total_seconds())
                             hours, remainder = divmod(total_seconds, 3600)
                             minutes, seconds = divmod(remainder, 60)
@@ -139,24 +138,23 @@ def get_arc_raiders_events_from_api_calculated():
                                 'time_left': time_left_str,
                                 'end_time': end_datetime
                             })
-                            logger.info(
-                                f"Добавлено активное событие (сегодня): {name} на {location}, осталось {time_left_str}")
+                            logger.info(f"Добавлено активное событие (сегодня): {name} на {location}, осталось {time_left_str}")
                             # Переходим к следующему окну, т.к. активное уже найдено для этого (name, location)
                             continue
 
                     # Случай 2: start > end (например, 23:00 - 01:00 -> событие пересекает полночь)
-                    else:  # start_time > end_time
+                    else: # start_time > end_time
                         if (current_time_only >= start_time) or (current_time_only < end_time):
                             # Событие активно сегодня или перешло на завтра
                             # Вычисляем время окончания
                             # Если текущее время >= start_time, значит событие началось сегодня и закончится завтра
                             if current_time_only >= start_time:
                                 end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
-                            else:  # current_time_only < end_time -> событие началось вчера и заканчивается сегодня
+                            else: # current_time_only < end_time -> событие началось вчера и заканчивается сегодня
                                 end_datetime_naive = datetime.combine(current_date_utc, end_time)
 
-                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc)  # <-- offset-aware
-                            time_left = end_datetime - current_time_utc  # <-- Теперь оба aware
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
                             total_seconds = int(time_left.total_seconds())
                             hours, remainder = divmod(total_seconds, 3600)
                             minutes, seconds = divmod(remainder, 60)
@@ -172,29 +170,29 @@ def get_arc_raiders_events_from_api_calculated():
                                 'time_left': time_left_str,
                                 'end_time': end_datetime
                             })
-                            logger.info(
-                                f"Добавлено активное событие (переходящее): {name} на {location}, осталось {time_left_str}")
-                            continue  # Переходим к следующему окну
+                            logger.info(f"Добавлено активное событие (переходящее): {name} на {location}, осталось {time_left_str}")
+                            continue # Переходим к следующему окну
+
 
                     # --- Вычисление предстоящего ---
                     # Если не активно, ищем ближайшее время начала
                     # Случай 1: start и end в один день (например, 01:00 - 02:00)
                     if start_time <= end_time:
-                        if start_time > current_time_only:  # Начнётся сегодня
+                        if start_time > current_time_only: # Начнётся сегодня
                             start_datetime_naive = datetime.combine(current_date_utc, start_time)
-                        else:  # Началось сегодня, но уже прошло, ищем на завтра
+                        else: # Началось сегодня, но уже прошло, ищем на завтра
                             start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
                     # Случай 2: start > end (например, 23:00 - 01:00)
-                    else:  # start_time > end_time
-                        if current_time_only < start_time and current_time_only >= end_time:  # Событие еще не началось сегодня (например, 22:00, а старт в 23:00)
+                    else: # start_time > end_time
+                        if current_time_only < start_time and current_time_only >= end_time: # Событие еще не началось сегодня (например, 22:00, а старт в 23:00)
                             start_datetime_naive = datetime.combine(current_date_utc, start_time)
-                        else:  # Событие уже прошло сегодня, ищем на завтра или позже
+                        else: # Событие уже прошло сегодня, ищем на завтра или позже
                             start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
 
                     # Сделать start_datetime aware
-                    start_datetime = start_datetime_naive.replace(tzinfo=timezone.utc)  # <-- offset-aware
+                    start_datetime = start_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
 
-                    time_to_start = start_datetime - current_time_utc  # <-- Теперь оба aware
+                    time_to_start = start_datetime - current_time_utc # <-- Теперь оба aware
                     total_seconds = int(time_to_start.total_seconds())
                     hours, remainder = divmod(total_seconds, 3600)
                     minutes, seconds = divmod(remainder, 60)
@@ -206,27 +204,24 @@ def get_arc_raiders_events_from_api_calculated():
 
                     # Проверяем, является ли это окно ближайшим для данной пары (name, location)
                     key = (name, location)
-                    if key not in next_upcoming_for_location or start_datetime < next_upcoming_for_location[key][
-                        'start_time']:
+                    if key not in next_upcoming_for_location or start_datetime < next_upcoming_for_location[key]['start_time']:
                         next_upcoming_for_location[key] = {
                             'time_left': time_to_start_str,
-                            'start_time': start_datetime  # <-- Убедиться, что это aware
+                            'start_time': start_datetime # <-- Убедиться, что это aware
                         }
-                        logger.info(
-                            f"Найдено предстоящее событие для {name} на {location}, начнётся через {time_to_start_str} ({start_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')})")
+                        logger.info(f"Найдено предстоящее событие для {name} на {location}, начнётся через {time_to_start_str} ({start_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')})")
 
                 except ValueError as e:
-                    logger.error(
-                        f"Error parsing time for event {name} at {location}: {start_str}, {end_str}. Error: {e}")
+                    logger.error(f"Error parsing time for event {name} at {location}: {start_str}, {end_str}. Error: {e}")
 
         # После обработки всех событий, добавляем ближайшие предстоящие из словаря
         for (name, location), event_info in next_upcoming_for_location.items():
-            upcoming_events.append({
-                'name': name,
-                'location': location,
-                'time_left': event_info['time_left'],
-                'start_time': event_info['start_time']  # <-- Должно быть aware
-            })
+             upcoming_events.append({
+                 'name': name,
+                 'location': location,
+                 'time_left': event_info['time_left'],
+                 'start_time': event_info['start_time'] # <-- Должно быть aware
+             })
 
         # Сортируем предстоящие события по времени начала
         # Сортировка будет корректной, так как start_time теперь aware
@@ -242,75 +237,36 @@ def get_arc_raiders_events_from_api_calculated():
         logger.error(f"Неожиданная ошибка при обработке данных из API: {e}")
         return [], []
 
-
 # --- Обработчики команд и кнопок ---
+# (Код обработчиков остаётся без изменений, меняется только функция получения данных)
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    """Отправляет приветственное сообщение с кнопками."""
-    # Основная клавиатура с кнопками "События" и "Ссылки"
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
-        [types.InlineKeyboardButton(text="Ссылки и Информация", callback_data="links_menu")]
+        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")]
     ])
     await message.answer(
-        f"Привет, {message.from_user.first_name}! Выбери действие:",
+        f"Привет, {message.from_user.first_name}! Нажми кнопку ниже, чтобы посмотреть активные и предстоящие события в ARC Raiders.",
         reply_markup=keyboard
     )
-
-
-@dp.message(Command("links"))
-async def cmd_links(message: types.Message):
-    """Отправляет сообщение с кнопками ссылок."""
-    await send_links_menu(message)
-
-
-async def send_links_menu(message: types.Message):
-    """Отправляет сообщение с кнопками ссылок."""
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
-        [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
-        [types.InlineKeyboardButton(text="🆘 Поддержка", url=LINKS["support"])],
-        [types.InlineKeyboardButton(text="🆕 Обновление игры", url=LINKS["update"])],
-        # Кнопка "Назад" для возврата в главное меню
-        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
-    ])
-    await message.answer("Выбери нужную ссылку:", reply_markup=keyboard)
-
 
 @dp.callback_query(lambda c: c.data == 'events')
 async def process_callback_events(callback_query: types.CallbackQuery):
     await send_events_message(callback_query.message)
     await callback_query.answer()
 
-
-@dp.callback_query(lambda c: c.data == 'links_menu')
-async def process_callback_links_menu(callback_query: types.CallbackQuery):
-    await send_links_menu(callback_query.message)
-    await callback_query.answer()
-
-
-@dp.callback_query(lambda c: c.data == 'back_to_main')
-async def process_callback_back_to_main(callback_query: types.CallbackQuery):
-    await cmd_start(callback_query.message)
-    await callback_query.answer()
-
-
 async def send_events_message(message: types.Message):
-    # Вызываем функцию получения данных из API с вычислением
+    # Вызываем НОВУЮ функцию получения данных из API с вычислением
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
     response_text = format_event_message(active, "active")
     response_text += "\n" + format_event_message(upcoming, "upcoming")
 
-    # Клавиатура с кнопками "Обновить" и "Назад"
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="events")],
-        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="events")]
     ])
 
     await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
-
 
 # --- Форматирование сообщения с переводом ---
 def format_event_message(events, event_type="active"):
@@ -331,12 +287,10 @@ def format_event_message(events, event_type="active"):
             message += f"- **{translated_name}** на карте **{translated_location}** (начнётся через: {event['time_left']})\n"
     return message
 
-
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API и кнопками ссылок...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API...")
     await dp.start_polling(bot)
-
 
 if __name__ == '__main__':
     try:
