@@ -272,7 +272,7 @@ async def send_events_message(message: types.Message, edit: bool = False):
 
     # Фильтруем предстоящие события по временному лимиту (например, 24 часа)
     current_time = datetime.now(timezone.utc)
-    time_limit = current_time + timedelta(hours=24)
+    time_limit = current_time + timedelta(hours=2)
     filtered_upcoming = [event for event in upcoming if event['start_time'] <= time_limit]
     limited_upcoming = filtered_upcoming[:6] # Берём первые 6 из отфильтрованных
 
