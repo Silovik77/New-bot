@@ -23,6 +23,36 @@ bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
+# --- Словари перевода ---
+EVENT_TRANSLATIONS = {
+    "Electromagnetic Storm": "Электромагнитная буря",
+    "Harvester": "Жнец",
+    "Lush Blooms": "Цветущие заросли",
+    "Matriarch": "Матриарх",
+    "Night Raid": "Ночной налёт",
+    "Uncovered Caches": "Обнаруженные тайники",
+    "Launch Tower Loot": "Добыча с пусковой башни",
+    "Hidden Bunker": "Скрытый бункер", # Добавлено из HTML
+    "Husk Graveyard": "Кладбище коконов", # Добавлено из HTML
+    "Prospecting Probes": "Геологические зонды", # Добавлено из HTML
+}
+
+MAP_TRANSLATIONS = {
+    "Dam": "Плотина",
+    "Buried City": "Закопанный город",
+    "Spaceport": "Космопорт",
+    "Blue Gate": "Синие врата",
+    "Stella Montis": "Стелла Монти",
+}
+
+# --- Ссылки для кнопок ---
+LINKS = {
+    "streams": "https://www.twitch.tv/directory/game/ARC%20Raider",
+    "telegram": "https://t.me/arcraiders", # Пример, замените на реальную ссылку
+    "support": "https://www.arcraiders.com/support", # Пример, замените на реальную ссылку
+    "update": "https://www.arcraiders.com/patch-notes", # Пример, замените на реальную ссылку
+}
+
 # --- Функции для получения и обработки данных из API ---
 
 def get_arc_raiders_events_from_api_calculated():
@@ -83,9 +113,9 @@ def get_arc_raiders_events_from_api_calculated():
                             hours, remainder = divmod(total_seconds, 3600)
                             minutes, seconds = divmod(remainder, 60)
                             time_parts = []
-                            if hours > 0: time_parts.append(f"{hours}h")
-                            if minutes > 0: time_parts.append(f"{minutes}m")
-                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}s")
+                            if hours > 0: time_parts.append(f"{hours}ч")
+                            if minutes > 0: time_parts.append(f"{minutes}м")
+                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
                             time_left_str = " ".join(time_parts)
 
                             active_events.append({
@@ -115,9 +145,9 @@ def get_arc_raiders_events_from_api_calculated():
                             hours, remainder = divmod(total_seconds, 3600)
                             minutes, seconds = divmod(remainder, 60)
                             time_parts = []
-                            if hours > 0: time_parts.append(f"{hours}h")
-                            if minutes > 0: time_parts.append(f"{minutes}m")
-                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}s")
+                            if hours > 0: time_parts.append(f"{hours}ч")
+                            if minutes > 0: time_parts.append(f"{minutes}м")
+                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
                             time_left_str = " ".join(time_parts)
 
                             active_events.append({
@@ -153,9 +183,9 @@ def get_arc_raiders_events_from_api_calculated():
                     hours, remainder = divmod(total_seconds, 3600)
                     minutes, seconds = divmod(remainder, 60)
                     time_parts = []
-                    if hours > 0: time_parts.append(f"{hours}h")
-                    if minutes > 0: time_parts.append(f"{minutes}m")
-                    if seconds > 0 or not time_parts: time_parts.append(f"{seconds}s")
+                    if hours > 0: time_parts.append(f"{hours}ч")
+                    if minutes > 0: time_parts.append(f"{minutes}м")
+                    if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
                     time_to_start_str = " ".join(time_parts)
 
                     # Проверяем, является ли это окно ближайшим для данной пары (name, location)
@@ -194,51 +224,89 @@ def get_arc_raiders_events_from_api_calculated():
         return [], []
 
 # --- Обработчики команд и кнопок ---
-# (Код обработчиков остаётся без изменений, меняется только функция получения данных)
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    """Отправляет приветственное сообщение с кнопками."""
+    # Основная клавиатура с кнопками "События" и "Ссылки"
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")]
+        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
+        [types.InlineKeyboardButton(text="Ссылки и Информация", callback_data="links_menu")]
     ])
     await message.answer(
-        f"Привет, {message.from_user.first_name}! Нажми кнопку ниже, чтобы посмотреть активные и предстоящие события в ARC Raiders.",
+        f"Привет, {message.from_user.first_name}! Выбери действие:",
         reply_markup=keyboard
     )
+
+@dp.message(Command("links"))
+async def cmd_links(message: types.Message):
+    """Отправляет сообщение с кнопками ссылок."""
+    await send_links_menu(message)
+
+async def send_links_menu(message: types.Message):
+    """Отправляет сообщение с кнопками ссылок."""
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
+        [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
+        [types.InlineKeyboardButton(text="🆘 Поддержка", url=LINKS["support"])],
+        [types.InlineKeyboardButton(text="🆕 Обновление игры", url=LINKS["update"])],
+        # Кнопка "Назад" для возврата в главное меню
+        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
+    ])
+    await message.answer("Выбери нужную ссылку:", reply_markup=keyboard)
 
 @dp.callback_query(lambda c: c.data == 'events')
 async def process_callback_events(callback_query: types.CallbackQuery):
     await send_events_message(callback_query.message)
     await callback_query.answer()
 
+@dp.callback_query(lambda c: c.data == 'links_menu')
+async def process_callback_links_menu(callback_query: types.CallbackQuery):
+    await send_links_menu(callback_query.message)
+    await callback_query.answer()
+
+@dp.callback_query(lambda c: c.data == 'back_to_main')
+async def process_callback_back_to_main(callback_query: types.CallbackQuery):
+    await cmd_start(callback_query.message)
+    await callback_query.answer()
+
 async def send_events_message(message: types.Message):
-    # Вызываем НОВУЮ функцию получения данных из API с вычислением
+    # Вызываем функцию получения данных из API с вычислением
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
     response_text = format_event_message(active, "active")
     response_text += "\n" + format_event_message(upcoming, "upcoming")
 
+    # Клавиатура с кнопками "Обновить" и "Назад"
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="events")]
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="events")],
+        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main")]
     ])
 
     await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
 
+# --- Форматирование сообщения с переводом ---
 def format_event_message(events, event_type="active"):
+    """Форматирует список событий в текстовое сообщение с переводом."""
     if not events:
         return f"Нет {'активных' if event_type == 'active' else 'предстоящих'} событий.\n"
 
     header = "Активные события:\n" if event_type == "active" else "Предстоящие события:\n"
     message = header
     for event in events:
+        # Получаем перевод или оставляем оригинальное имя, если перевод не найден
+        translated_name = EVENT_TRANSLATIONS.get(event['name'], event['name'])
+        translated_location = MAP_TRANSLATIONS.get(event['location'], event['location'])
+
         if event_type == "active":
-            message += f"- **{event['name']}** на карте **{event['location']}** (осталось: {event['time_left']})\n"
+            message += f"- **{translated_name}** на карте **{translated_location}** (осталось: {event['time_left']})\n"
         else:
-            message += f"- **{event['name']}** на карте **{event['location']}** (начнётся через: {event['time_left']})\n"
+            message += f"- **{translated_name}** на карте **{translated_location}** (начнётся через: {event['time_left']})\n"
     return message
 
+# --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API и кнопками ссылок...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
