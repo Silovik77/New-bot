@@ -112,26 +112,24 @@ SCHEDULE = [
     (15, "Uncovered Caches", "Buried City"),
     (15, "Night Raid", "Blue Gate"),
 
-    (16, "Prospecting Probes", "Dam"),
-    (16, "Night Raid", "Spaceport"),
+    (16, "Matriarch", "Dam"),
+    (16, "Electromagnetic Storm", "Spaceport"),
 
 
-    (17, "Night Raid", "Dam"),
-    (17, "Husk Graveyard", "Buried City"),
-    (17, "Uncovered Caches", "Blue Gate"),
+    (17, "Electromagnetic Storm", "Dam"),
+    (17, "Matriarch", "Buried City"),
     (17, "Night Raid", "Stella Montis"),
 
-    (18, "Uncovered Caches", "Spaceport"),
     (18, "Night Raid", "Buried City"),
+    (18, "Electromagnetic Storm", "Blue Gate"),
+    (18, "Launch Tower Loot", "Spaceport"),
 
-    (19, "Harvester", "Dam"),
-    (19, "Electromagnetic Storm", "Spaceport"),
-    (19, "Electromagnetic Storm", "Blue Gate"),
+    (19, "Night Raid", "Spaceport"),
+    (19, "Lush Blooms", "Buried City"),
 
     (20, "Harvester", "Blue Gate"),
     (20, "Electromagnetic Storm", "Dam"),
     (20, "Lush Blooms", "Dam"),
-    (20, "Lush Blooms", "Buried City"),
     (20, "Night Raid", "Stella Montis"),
 
     (21, "Night Raid", "Buried City"),
