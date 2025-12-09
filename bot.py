@@ -98,31 +98,64 @@ def get_arc_raiders_events_from_api_calculated():
             # Проходим по каждому временному окну события на этой карте
             for time_window in times_list:
                 start_str = time_window.get('start') # Например, "01:00"
-                end_str = time_window.get('end')     # Например, "02:00"
+                end_str = time_window.get('end')     # Например, "02:00" или "24:00"
 
                 if not start_str or not end_str:
                     logger.warning(f"Missing start or end time for event {name} at {location}")
                     continue
 
                 try:
-                    # Парсим время из строки "HH:MM" в объект time
+                    # Парсим время начала
                     start_time = datetime.strptime(start_str, '%H:%M').time() # <-- offset-naive time object
-                    end_time = datetime.strptime(end_str, '%H:%M').time()     # <-- offset-naive time object
+
+                    # --- ИСПРАВЛЕНИЕ ДЛЯ 24:00 ---
+                    if end_str == "24:00":
+                        # Интерпретируем 24:00 как конец текущего дня (23:59:59.999...)
+                        # Для логики сравнения времени в пределах дня, используем 23:59:59
+                        # или обрабатываем особым образом при вычислении end_datetime.
+                        # Лучше сразу перейти к вычислению end_datetime.
+                        is_end_midnight_next_day = True
+                        # Для сравнения времени в пределах дня (current_time_only)
+                        # end_time_for_comparison = time(23, 59, 59)
+                        # Но для случая 23:00 - 24:00, current_time_only < 24:00 всегда True
+                        # Поэтому логика активности для start <= current < end (где end=24:00)
+                        # становится: start <= current_time_only (до конца дня)
+                    else:
+                        end_time_for_comparison = datetime.strptime(end_str, '%H:%M').time()
+                        is_end_midnight_next_day = False
+                    # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
                     # --- Вычисление активности ---
-                    # Случай 1: start и end в один день (например, 01:00 - 02:00)
-                    if start_time <= end_time:
-                        if start_time <= current_time_only < end_time:
+                    # Случай 1: start и end в один день (например, 01:00 - 02:00) или start и 24:00 (например, 23:00 - 24:00)
+                    if start_time <= end_time_for_comparison or is_end_midnight_next_day:
+                        # Для 24:00: start_time <= current_time_only (до конца дня)
+                        # Для обычного: start_time <= current_time_only < end_time_for_comparison
+                        if is_end_midnight_next_day:
+                            # Событие активно, если start <= current_time_only и окно до конца дня
+                            is_active = start_time <= current_time_only
+                        else:
+                            # Событие активно, если start <= current_time_only < end
+                            is_active = start_time <= current_time_only < end_time_for_comparison
+
+                        if is_active:
                             # Событие активно сегодня
                             # Вычисляем время окончания как datetime объект (на сегодня, в UTC)
                             # datetime.combine создает offset-naive datetime, нужно сделать его aware
-                            end_datetime_naive = datetime.combine(current_date_utc, end_time)
+                            # Для 24:00 - это конец текущего дня, т.е. 00:00 следующего дня
+                            if is_end_midnight_next_day:
+                                # Окончание в 24:00 означает 00:00 следующего дня
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), datetime.min.time()) # time(0, 0)
+                            else:
+                                end_datetime_naive = datetime.combine(current_date_utc, end_time_for_comparison)
                             end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
 
-                            # Если end_datetime <= current_time_utc (например, из-за секунд/миллисекунд), добавляем день
+                            # Проверяем, что end_datetime > current_time_utc, иначе добавляем день (маловероятно для 24:00, но на всякий)
                             if end_datetime <= current_time_utc:
                                 logger.warning(f"End time {end_datetime} is <= current time {current_time_utc}, adding 1 day.")
-                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
+                                if is_end_midnight_next_day:
+                                     end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=2), datetime.min.time())
+                                else:
+                                     end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time_for_comparison)
                                 end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc)
 
                             time_left = end_datetime - current_time_utc # <-- Теперь оба aware
@@ -146,15 +179,15 @@ def get_arc_raiders_events_from_api_calculated():
                             continue
 
                     # Случай 2: start > end (например, 23:00 - 01:00 -> событие пересекает полночь)
-                    else: # start_time > end_time
-                        if (current_time_only >= start_time) or (current_time_only < end_time):
+                    else: # start_time > end_time_for_comparison (и не 24:00)
+                        if (current_time_only >= start_time) or (current_time_only < end_time_for_comparison):
                             # Событие активно сегодня или перешло на завтра
                             # Вычисляем время окончания
                             # Если текущее время >= start_time, значит событие началось сегодня и закончится завтра
                             if current_time_only >= start_time:
-                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time)
-                            else: # current_time_only < end_time -> событие началось вчера и заканчивается сегодня
-                                end_datetime_naive = datetime.combine(current_date_utc, end_time)
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time_for_comparison)
+                            else: # current_time_only < end_time_for_comparison -> событие началось вчера и заканчивается сегодня
+                                end_datetime_naive = datetime.combine(current_date_utc, end_time_for_comparison)
 
                             end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
                             time_left = end_datetime - current_time_utc # <-- Теперь оба aware
@@ -179,15 +212,28 @@ def get_arc_raiders_events_from_api_calculated():
 
                     # --- Вычисление предстоящего ---
                     # Если не активно, ищем ближайшее время начала
-                    # Случай 1: start и end в один день (например, 01:00 - 02:00)
-                    if start_time <= end_time:
-                        if start_time > current_time_only: # Начнётся сегодня
-                            start_datetime_naive = datetime.combine(current_date_utc, start_time)
-                        else: # Началось сегодня, но уже прошло, ищем на завтра
-                            start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+                    # Случай 1: start и end в один день (например, 01:00 - 02:00) или start и 24:00 (например, 23:00 - 24:00)
+                    if start_time <= end_time_for_comparison or is_end_midnight_next_day:
+                        if is_end_midnight_next_day:
+                            # Если событие заканчивается в 24:00, оно начинается сегодня и заканчивается завтра.
+                            # Если оно уже началось (start <= current), то оно активно (обработано выше).
+                            # Если оно еще не началось (current < start), то начнётся сегодня.
+                            if current_time_only < start_time: # Начнётся сегодня
+                                start_datetime_naive = datetime.combine(current_date_utc, start_time)
+                            else: # Уже началось, но активность не прошла (была бы выше), значит что-то не так с логикой или время на секунду изменилось.
+                                 # На всякий случай, если current_time == start_time и оно не активно, ищем следующий день
+                                 # Но это маловероятно, т.к. start <= current < 24:00 означает активность.
+                                 # Если всё же не активно, ищем следующий день.
+                                 start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+                        else:
+                            if start_time > current_time_only: # Начнётся сегодня
+                                start_datetime_naive = datetime.combine(current_date_utc, start_time)
+                            else: # Началось сегодня, но уже прошло, ищем на завтра
+                                start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+
                     # Случай 2: start > end (например, 23:00 - 01:00)
-                    else: # start_time > end_time
-                        if current_time_only < start_time and current_time_only >= end_time: # Событие еще не началось сегодня (например, 22:00, а старт в 23:00)
+                    else: # start_time > end_time_for_comparison
+                        if current_time_only < start_time and current_time_only >= end_time_for_comparison: # Событие еще не началось сегодня (например, 22:00, а старт в 23:00)
                             start_datetime_naive = datetime.combine(current_date_utc, start_time)
                         else: # Событие уже прошло сегодня, ищем на завтра или позже
                             start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
@@ -216,6 +262,11 @@ def get_arc_raiders_events_from_api_calculated():
 
                 except ValueError as e:
                     logger.error(f"Error parsing time for event {name} at {location}: {start_str}, {end_str}. Error: {e}")
+                    # Пропускаем это окно, если ошибка парсинга (например, из-за 24:00 без обработки)
+                    continue # Переходим к следующему окну
+                except Exception as e:
+                    logger.error(f"Unexpected error processing time for event {name} at {location}: {start_str}, {end_str}. Error: {e}")
+                    continue # Переходим к следующему окну
 
         # После обработки всех событий, добавляем ближайшие предстоящие из словаря
         for (name, location), event_info in next_upcoming_for_location.items():
@@ -274,17 +325,14 @@ async def process_callback_events(callback_query: types.CallbackQuery):
 async def send_events_message(message: types.Message, edit: bool = False):
     active, upcoming = get_arc_raiders_events_from_api_calculated()
 
-    # Фильтруем предстоящие события по временному лимиту (например, 24 часа)
-    current_time = datetime.now(timezone.utc)
-    time_limit = current_time + timedelta(hours=24)
-    filtered_upcoming = [event for event in upcoming if event['start_time'] <= time_limit]
-    limited_upcoming = filtered_upcoming[:6] # Берём первые 6 из отфильтрованных
-
+    # Форматируем активные события
     active_message = format_event_message(active, "active")
-    upcoming_message = format_event_message(limited_upcoming, "upcoming")
+    # Форматируем ВСЕ предстоящие события (без ограничения)
+    upcoming_message = format_event_message(upcoming, "upcoming")
 
+    # Объединяем сообщения
     response_text = active_message
-    if limited_upcoming:
+    if upcoming: # Добавляем предстоящие, только если они есть
         response_text += "\n" + upcoming_message
 
     # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
@@ -330,7 +378,7 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
     await cmd_start(callback_query.message)
     await callback_query.answer()
 
-# --- Форматирование сообщения с переводом, ограничением и эмодзи ---
+# --- Форматирование сообщения с переводом, без ограничения и с эмодзи ---
 def format_event_message(events, event_type="active"):
     """Форматирует список событий в текстовое сообщение с переводом и эмодзи."""
     if not events:
@@ -356,7 +404,7 @@ def format_event_message(events, event_type="active"):
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API, кнопками ссылок, текстом об обновлении и редактированием сообщений...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
