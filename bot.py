@@ -301,7 +301,7 @@ async def cmd_start(message: types.Message):
         [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
         [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
         [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
-        [types.InlineKeyboardButton(text="🆘 Поддержка", url=LINKS["support"])],
+        [types.InlineKeyboardButton(text="💸 Поддержка", url=LINKS["support"])],
         [types.InlineKeyboardButton(text="🆕 Обновление игры", callback_data="game_update_text")]
     ])
     await message.answer(
@@ -397,7 +397,7 @@ def format_event_message(events, event_type="active"):
         translated_location = MAP_TRANSLATIONS.get(event['location'], event['location'])
 
         if event_type == "active":
-            message += f"- **{translated_name}** на карте **{translated_location}** (осталось: {event['time_left']})\n"
+            message += f"- __{translated_name}__ на карте **{translated_location}** (осталось: {event['time_left']})\n"
         else:
             message += f"- **{translated_name}** на карте **{translated_location}** (начнётся через: {event['time_left']})\n"
     return message
