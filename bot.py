@@ -5,7 +5,13 @@ from datetime import datetime, timedelta, timezone
 import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext  # <-- ВАЖНО: FSMContext импортирован
+from aiogram.fsm.state import State, StatesGroup  # <-- ВАЖНО: StatesGroup импортирован
 from aiogram.fsm.storage.memory import MemoryStorage
+
+# --- Добавляем класс состояний для обратной связи ---
+class Feedback(StatesGroup):
+    waiting_for_message = State()
 
 # --- Настройки ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -13,7 +19,7 @@ if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
 # Убран лишний пробел в конце URL
-EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
+EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers' # <-- Исправлено: убран пробел
 
 # --- Настройка логирования ---
 logging.basicConfig(level=logging.INFO)
@@ -21,8 +27,9 @@ logger = logging.getLogger(__name__)
 
 # --- Инициализация бота ---
 bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
+storage = MemoryStorage() # Используем MemoryStorage, как и раньше
 dp = Dispatcher(storage=storage)
+
 
 # --- Словари перевода ---
 EVENT_TRANSLATIONS = {
