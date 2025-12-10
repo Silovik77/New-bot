@@ -302,16 +302,21 @@ def get_arc_raiders_events_from_api_calculated():
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     """Отправляет приветственное сообщение с основными кнопками."""
-    # Клавиатура с кнопками "События", "Ссылки", "Обратная связь" и "Обновление игры" в главном меню
+    # Клавиатура с кнопками в нужном порядке и с новыми названиями
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        # <-- ПРОВЕРКА: callback_data="events"
+        # 1. События ARC Raiders
         [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
-        [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
-        [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
-        [types.InlineKeyboardButton(text="💸 Поддержка", url=LINKS["support"])],
-        # Добавляем кнопку "Обратная связь"
-        [types.InlineKeyboardButton(text="✉️ Обратная связь", callback_data="feedback_start")],
-        [types.InlineKeyboardButton(text="🆕 Обновление игры", callback_data="game_update_text")]
+        # 2. Обновление игры
+        [types.InlineKeyboardButton(text="Обновление игры", callback_data="game_update_text")],
+        # 3. Twitch
+        [types.InlineKeyboardButton(text="Twitch", url=LINKS["streams"])], # Использует URL из словаря LINKS
+        # 4. Телеграмм канал
+        [types.InlineKeyboardButton(text="Телеграмм канал", url=LINKS["telegram"])], # Использует URL из словаря LINKS
+        # 5. Обратная связь (ссылка)
+        # ЗАМЕНИТЕ "https://t.me/your_telegram_username" НА РЕАЛЬНУЮ ССЫЛКУ
+        [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/your_telegram_username")],
+        # 6. Поддержка
+        [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])], # Использует URL из словаря LINKS
     ])
     # Отправляем НОВОЕ сообщение с главным меню
     await message.answer(
