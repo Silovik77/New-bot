@@ -405,8 +405,8 @@ async def send_events_message(message: types.Message, edit: bool = False):
 
     # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        # <-- ПРОВЕРКА: callback_data="refresh_events"
-        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")],
+        # <-- ИСПРАВЛЕНО: callback_data="refresh_events"
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")], # <-- Изменено с "events" на "refresh_events"
         # <-- ПРОВЕРКА: callback_data="start_menu"
         [types.InlineKeyboardButton(text="🔙 Назад", callback_data="start_menu")]
     ])
@@ -426,6 +426,7 @@ async def send_events_message(message: types.Message, edit: bool = False):
         # Отправляем новое сообщение
         # parse_mode изменён на HTML
         await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
+
 
 # Новый обработчик для обновления (редактирования) сообщения с событиями
 @dp.callback_query(lambda c: c.data == 'refresh_events')
