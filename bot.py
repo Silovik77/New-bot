@@ -314,7 +314,7 @@ async def cmd_start(message: types.Message):
         [types.InlineKeyboardButton(text="Телеграмм канал", url=LINKS["telegram"])], # Использует URL из словаря LINKS
         # 5. Обратная связь (ссылка)
         # ЗАМЕНИТЕ "https://t.me/your_telegram_username" НА РЕАЛЬНУЮ ССЫЛКУ
-        [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/your_telegram_username")],
+        [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/Silovik_ttv")],
         # 6. Поддержка бота
         [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])], # Использует URL из словаря LINKS
     ])
