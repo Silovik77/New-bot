@@ -344,15 +344,15 @@ async def send_events_message(message: types.Message, edit: bool = False):
     if edit:
         # Пытаемся отредактировать существующее сообщение
         try:
-            await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='Markdown')
+            await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='MarkdownV2')
             logger.info("Сообщение с событиями отредактировано.")
         except Exception as e:
             # Если не получилось отредактировать (например, сообщение слишком старое), отправим новое
             logger.warning(f"Не удалось отредактировать сообщение: {e}. Отправляем новое.")
-            await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
+            await message.answer(response_text, reply_markup=keyboard, parse_mode='MarkdownV2')
     else:
         # Отправляем новое сообщение
-        await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
+        await message.answer(response_text, reply_markup=keyboard, parse_mode='MarkdownV2')
 
 # Новый обработчик для обновления (редактирования) сообщения с событиями
 @dp.callback_query(lambda c: c.data == 'refresh_events')
