@@ -314,7 +314,7 @@ async def process_callback_game_update(callback_query: types.CallbackQuery):
     # Создаём клавиатуру с кнопками "Назад" и "События"
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
         [types.InlineKeyboardButton(text="🔙 Назад", callback_data="start_menu")],
-        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")]
+        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="refresh_events")]
     ])
     # Редактируем текущее сообщение (главное меню), заменяя его на текст обновления с новой клавиатурой
     try:
