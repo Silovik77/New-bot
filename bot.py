@@ -12,6 +12,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
+# Убран лишний пробел в конце URL
 EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
 
 # --- Настройка логирования ---
@@ -46,6 +47,7 @@ MAP_TRANSLATIONS = {
 }
 
 # --- Ссылки для кнопок ---
+# Убраны лишние пробелы в конце URL
 LINKS = {
     "streams": "https://www.twitch.tv/silovik_",
     "telegram": "https://t.me/silovik_stream", # Пример, замените на реальную ссылку
@@ -56,14 +58,14 @@ LINKS = {
 # --- Текст для обновления игры ---
 # Впишите сюда текст, который будет отправляться при нажатии кнопки "Обновление игры"
 GAME_UPDATE_TEXT = """
-**ВАЖНОЕ ОБНОВЛЕНИЕ ARC RAIDERS!** (10.12.2025)
+<strong>ВАЖНОЕ ОБНОВЛЕНИЕ ARC RAIDERS!</strong> (10.12.2025)
 
-🔥 **Новое событие: "Танец Огня"**
-   - Доступно на карте "Космопорт".
+🔥 <strong>Новое событие: \"Танец Огня\"</strong>
+   - Доступно на карте \"Космопорт\".
    - Только для игроков 30+ уровня.
    - Награды: Редкие ARCs, Скины оружия.
 
-🛠 **Исправления:**
+🛠 <strong>Исправления:</strong>
    - Исправлена ошибка с пропажей добычи.
    - Улучшена стабильность серверов в Азии.
 
@@ -312,7 +314,8 @@ async def cmd_start(message: types.Message):
 # Обработчик для обновления игры
 @dp.callback_query(lambda c: c.data == 'game_update_text')
 async def process_callback_game_update(callback_query: types.CallbackQuery):
-    await callback_query.message.answer(GAME_UPDATE_TEXT, parse_mode='Markdown')
+    # parse_mode изменён на HTML
+    await callback_query.message.answer(GAME_UPDATE_TEXT, parse_mode='HTML')
     await callback_query.answer()
 
 # Обработчик для событий
@@ -344,15 +347,18 @@ async def send_events_message(message: types.Message, edit: bool = False):
     if edit:
         # Пытаемся отредактировать существующее сообщение
         try:
-            await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='Markdown')
+            # parse_mode изменён на HTML
+            await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='HTML')
             logger.info("Сообщение с событиями отредактировано.")
         except Exception as e:
             # Если не получилось отредактировать (например, сообщение слишком старое), отправим новое
             logger.warning(f"Не удалось отредактировать сообщение: {e}. Отправляем новое.")
-            await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
+            # parse_mode изменён на HTML
+            await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
     else:
         # Отправляем новое сообщение
-        await message.answer(response_text, reply_markup=keyboard, parse_mode='Markdown')
+        # parse_mode изменён на HTML
+        await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
 
 # Новый обработчик для обновления (редактирования) сообщения с событиями
 @dp.callback_query(lambda c: c.data == 'refresh_events')
@@ -378,18 +384,20 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
     await cmd_start(callback_query.message)
     await callback_query.answer()
 
-# --- Форматирование сообщения с переводом, без ограничения и с эмодзи ---
+# --- Форматирование сообщения с переводом, без ограничения и с эмодзи (HTML) ---
 def format_event_message(events, event_type="active"):
-    """Форматирует список событий в текстовое сообщение с переводом и эмодзи."""
+    """Форматирует список событий в текстовое сообщение с переводом и эмодзи (HTML)."""
     if not events:
         # Если список пуст, возвращаем пустую строку или сообщение, только если это активные
         if event_type == "active":
+             # parse_mode='HTML', так что используем теги
              return f"Нет активных событий.\n"
         else: # Для предстоящих, если список пуст, просто не выводим заголовок
              return "" # или f"Нет предстоящих событий в ближайшее время.\n" если нужно сообщение
 
     # Выбираем заголовок с эмодзи
-    header = "🟢 Активные события:\n" if event_type == "active" else "🔴 Предстоящие события:\n"
+    # parse_mode='HTML', так что используем теги
+    header = "<strong>🟢 Активные события:</strong>\n" if event_type == "active" else "<strong>🔴 Предстоящие события:</strong>\n"
     message = header
     for event in events:
         # Получаем перевод или оставляем оригинальное имя, если перевод не найден
@@ -397,9 +405,14 @@ def format_event_message(events, event_type="active"):
         translated_location = MAP_TRANSLATIONS.get(event['location'], event['location'])
 
         if event_type == "active":
-            message += f"- __{translated_name}__ на карте **{translated_location}** (осталось: {event['time_left']})\n"
+            # parse_mode='HTML', используем теги <strong> и <em>
+            # <em> для курсива, <strong> для жирного
+            # translated_name будет курсивом, location - жирным
+            message += f"- <em>{translated_name}</em> на карте <strong>{translated_location}</strong> (осталось: {event['time_left']})\n"
         else:
-            message += f"- **{translated_name}** на карте **{translated_location}** (начнётся через: {event['time_left']})\n"
+            # parse_mode='HTML', используем теги <strong>
+            # translated_name и location будут жирными
+            message += f"- <strong>{translated_name}</strong> на карте <strong>{translated_location}</strong> (начнётся через: {event['time_left']})\n"
     return message
 
 # --- Основная функция запуска ---
