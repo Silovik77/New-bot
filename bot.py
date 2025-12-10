@@ -18,6 +18,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
+# Укажите ваш Telegram ID (число), чтобы получать сообщения. Найти можно, например, через @userinfobot
+YOUR_TELEGRAM_ID = "348743068"
+
 # Убран лишний пробел в конце URL
 EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers' # <-- Исправлено: убран пробел
 
