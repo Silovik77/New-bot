@@ -294,6 +294,7 @@ async def cmd_start(message: types.Message):
     """Отправляет приветственное сообщение с основными кнопками."""
     # Клавиатура с кнопками "События", "Ссылки", "Обратная связь" и "Обновление игры" в главном меню
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        # <-- ПРОВЕРКА: callback_data="events"
         [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
         [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
         [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
@@ -313,8 +314,10 @@ async def cmd_start(message: types.Message):
 async def process_callback_game_update(callback_query: types.CallbackQuery):
     # Создаём клавиатуру с кнопками "Назад" и "События"
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        # <-- ПРОВЕРКА: callback_data="start_menu" (для возврата в главное меню)
         [types.InlineKeyboardButton(text="🔙 Назад", callback_data="start_menu")],
-        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="refresh_events")]
+        # <-- ПРОВЕРКА: callback_data="events"
+        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")]
     ])
     # Редактируем текущее сообщение (главное меню), заменяя его на текст обновления с новой клавиатурой
     try:
@@ -334,7 +337,144 @@ async def process_callback_game_update(callback_query: types.CallbackQuery):
         )
     await callback_query.answer()
 
-# ... (остальные обработчики остаются без изменений, включая process_callback_feedback_start, process_feedback_message, process_callback_events, send_events_message, process_callback_refresh_events, process_callback_back_to_start) ...
+# --- НОВОЕ: Обработчики для обратной связи ---
+
+@dp.callback_query(lambda c: c.data == 'feedback_start')
+async def process_callback_feedback_start(callback_query: types.CallbackQuery, state: FSMContext):
+    """Запрашивает сообщение пользователя для обратной связи."""
+    await state.set_state(Feedback.waiting_for_message)
+    await callback_query.message.answer("Пожалуйста, введите ваше сообщение для обратной связи:")
+    await callback_query.answer()
+
+@dp.message(Feedback.waiting_for_message)
+async def process_feedback_message(message: types.Message, state: FSMContext):
+    """Получает сообщение пользователя и отправляет его администратору."""
+    user_message = message.text
+    user = message.from_user
+
+    # Формируем сообщение для отправки администратору
+    admin_message = f"""
+Новое сообщение в обратной связи от пользователя:
+
+ID: {user.id}
+Имя: {user.first_name} {user.last_name or ''}
+Имя пользователя: @{user.username or 'не указано'}
+
+Сообщение:
+{user_message}
+"""
+
+    try:
+        # Отправляем сообщение администратору (ваш ID)
+        await bot.send_message(chat_id=YOUR_TELEGRAM_ID, text=admin_message, parse_mode='HTML')
+        # Отправляем подтверждение пользователю
+        await message.answer("Спасибо за ваше сообщение! Оно было отправлено.")
+    except Exception as e:
+        logger.error(f"Ошибка при отправке сообщения администратору: {e}")
+        await message.answer("Произошла ошибка при отправке сообщения. Пожалуйста, попробуйте позже.")
+
+    # Сбрасываем состояние
+    await state.clear()
+
+
+# Обработчик для событий (ИЗМЕНЁН)
+@dp.callback_query(lambda c: c.data == 'events')
+async def process_callback_events(callback_query: types.CallbackQuery):
+    # Теперь вызываем send_events_message с edit=True
+    # Это означает, что бот попытается ОТРЕДАКТИРОВАТЬ сообщение, в котором была нажата кнопка 'events'
+    # (обычно это главное меню или меню обновления)
+    await send_events_message(callback_query.message, edit=True)
+    await callback_query.answer() # Отвечаем на callback_query
+
+# Функция отправки или редактирования сообщения с событиями
+async def send_events_message(message: types.Message, edit: bool = False):
+    # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ -->
+    logger.info("Вызов send_events_message")
+    active, upcoming = get_arc_raiders_events_from_api_calculated()
+    logger.info(f"Получено из API: {len(active)} активных, {len(upcoming)} предстоящих.")
+
+    # Форматируем активные события
+    active_message = format_event_message(active, "active")
+    # Форматируем ВСЕ предстоящие события (без ограничения)
+    upcoming_message = format_event_message(upcoming, "upcoming")
+
+    # Объединяем сообщения
+    response_text = active_message
+    if upcoming: # Добавляем предстоящие, только если они есть
+        response_text += "\n" + upcoming_message
+
+    # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        # <-- ПРОВЕРКА: callback_data="refresh_events"
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")],
+        # <-- ПРОВЕРКА: callback_data="start_menu"
+        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="start_menu")]
+    ])
+
+    if edit:
+        # Пытаемся отредактировать существующее сообщение
+        try:
+            # parse_mode изменён на HTML
+            await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='HTML')
+            logger.info("Сообщение с событиями отредактировано.")
+        except Exception as e:
+            # Если не получилось отредактировать (например, сообщение слишком старое), отправим новое
+            logger.warning(f"Не удалось отредактировать сообщение: {e}. Отправляем новое.")
+            # parse_mode изменён на HTML
+            await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
+    else:
+        # Отправляем новое сообщение
+        # parse_mode изменён на HTML
+        await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
+
+# Новый обработчик для обновления (редактирования) сообщения с событиями
+@dp.callback_query(lambda c: c.data == 'refresh_events')
+async def process_callback_refresh_events(callback_query: types.CallbackQuery):
+    # Вызываем send_events_message с edit=True
+    logger.info("Обработка callback 'refresh_events'") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
+    await send_events_message(callback_query.message, edit=True)
+    # ВАЖНО: НЕ вызываем callback_query.answer() сразу, потому что edit_text может занять время
+    # aiogram сам вызовет answer, если edit_text прошёл успешно.
+    # Если edit_text не удался и было отправлено новое сообщение, answer нужно вызвать вручную.
+    # Проверим, было ли сообщение отредактировано или отправлено новое.
+    # Проще всего всегда вызвать answer, если edit_text не вызвал исключения.
+    # Но если edit_text вызвал исключение и было отправлено новое сообщение,
+    # то answer вызовет ошибку, так как callback уже "истек".
+    # Обернём в try-except, чтобы избежать ошибки в последнем случае.
+    try:
+        await callback_query.answer()
+    except Exception:
+        pass # Игнорируем ошибку, если answer не нужен/невозможен
+
+# Обработчик для кнопки "Назад" из меню событий
+@dp.callback_query(lambda c: c.data == 'start_menu')
+async def process_callback_back_to_start(callback_query: types.CallbackQuery):
+    # Редактируем сообщение с событиями, заменяя его на главное меню
+    # Для этого нужно получить клавиатуру главного меню
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        # <-- ПРОВЕРКА: callback_data="events"
+        [types.InlineKeyboardButton(text="События ARC Raiders", callback_data="events")],
+        [types.InlineKeyboardButton(text="📺 Стримы", url=LINKS["streams"])],
+        [types.InlineKeyboardButton(text="💬 Телеграмм", url=LINKS["telegram"])],
+        [types.InlineKeyboardButton(text="💸 Поддержка", url=LINKS["support"])],
+        [types.InlineKeyboardButton(text="✉️ Обратная связь", callback_data="feedback_start")],
+        [types.InlineKeyboardButton(text="🆕 Обновление игры", callback_data="game_update_text")]
+    ])
+    try:
+        # Пытаемся отредактировать сообщение (список событий или обновление) и заменить его на главное меню
+        await callback_query.message.edit_text(
+            text=f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
+            reply_markup=keyboard
+        )
+        logger.info("Сообщение отредактировано: возврат в главное меню.")
+    except Exception as e:
+        logger.warning(f"Не удалось отредактировать сообщение для возврата в главное меню: {e}.")
+        # Если редактировать не получилось, отправим новое сообщение с главным меню
+        await callback_query.message.answer(
+            f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
+            reply_markup=keyboard
+        )
+    await callback_query.answer() # Отвечаем на callback_query
 
 # --- Форматирование сообщения с переводом, без ограничения и с эмодзи (HTML) ---
 def format_event_message(events, event_type="active"):
