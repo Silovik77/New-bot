@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-import re # Для регулярных выражений при парсинге времени
+import re # Для регулярных выражений при парсинге
 import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -37,13 +37,21 @@ EVENT_TRANSLATIONS = {
     "Husk Graveyard": "Кладбище ARC",
     "Prospecting Probes": "Геологические зонды",
     # Новые события из JSON
-    "Cold Snap": "Холодная вспышка", # Исправлено: Cold Snap вместо Cold Snap
+    "Cold Snap": "Холодная вспышка",
     "Locked Gate": "Закрытые врата",
-
+    "Husk Graveyard": "Кладбище коконов", # Повтор, но для надёжности
+    "Prospecting Probes": "Геологические зонды", # Повтор
+    "Launch Tower Loot": "Добыча с пусковой башни", # Повтор
+    "Uncovered Caches": "Обнаруженные тайники", # Повтор
+    "Lush Blooms": "Повышенная растительность", # Повтор
+    "Matriarch": "Матриарх", # Повтор
+    "Night Raid": "Ночной рейд", # Повтор
+    "Electromagnetic Storm": "Электромагнитная буря", # Повтор
+    "Harvester": "Сборщик", # Повтор
 }
 
 MAP_TRANSLATIONS = {
-    "Dam": "Плотина",
+    "Dam": "Дамба",
     "Buried City": "Погребенный город",
     "Spaceport": "Космопорт",
     "Blue Gate": "Синие врата",
@@ -63,16 +71,10 @@ LINKS = {
 GAME_UPDATE_TEXT = """
 <strong>ВАЖНОЕ ОБНОВЛЕНИЕ ARC RAIDERS!</strong> (10.12.2025)
 
-🔥 <strong>Новое событие: \"Танец Огня\"</strong>
-   - Доступно на карте \"Космопорт\".
-   - Только для игроков 30+ уровня.
-   - Награды: Редкие ARCs, Скины оружия.
-
-🛠 <strong>Исправления:</strong>
-   - Исправлена ошибка с пропажей добычи.
-   - Улучшена стабильность серверов в Азии.
-
-📅 Следующее обновление: 17.12.2025
+🔊 <strong>Информация:</strong>
+-Разработчики Arc Raiders запустили опрос о картах
+ Его можно пройти тут:
+https://id.embark.games/id/arc-raiders/survey  
 """
 
 # --- Функции для получения и обработки данных из API ---
@@ -180,7 +182,12 @@ def get_arc_raiders_events_from_api_calculated():
                                 'time_left': time_left_str,
                                 'end_time': end_datetime
                             })
-                            logger.info(f"Добавлено активное событие (сегодня): {name} на {location}, осталось {time_left_str}")
+                            # --- ИСПРАВЛЕНИЕ: ЛОГИРОВАНИЕ ---
+                            if is_end_midnight_next_day:
+                                logger.info(f"Добавлено активное событие (окно до конца дня): {name} на {location}, осталось {time_left_str}")
+                            else:
+                                logger.info(f"Добавлено активное событие (сегодня): {name} на {location}, осталось {time_left_str}")
+                            # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
                             # Переходим к следующему окну, т.к. активное уже найдено для этого (name, location)
                             continue
 
@@ -212,7 +219,17 @@ def get_arc_raiders_events_from_api_calculated():
                                 'time_left': time_left_str,
                                 'end_time': end_datetime
                             })
-                            logger.info(f"Добавлено активное событие (переходящее): {name} на {location}, осталось {time_left_str}")
+                            # --- ИСПРАВЛЕНИЕ: ЛОГИРОВАНИЕ ---
+                            # Было: logger.info(f"Добавлено активное событие (переходящее): {name} на {location}, осталось {time_left_str}")
+                            # Стало:
+                            if current_time_only < end_time_for_comparison:
+                                 # Активно, потому что началось вчера
+                                 log_msg_detail = f"началось вчера, закончится сегодня"
+                            else:
+                                 # Активно, потому что началось сегодня
+                                 log_msg_detail = f"началось сегодня, закончится завтра"
+                            logger.info(f"Добавлено активное событие (переходящее через полночь): {name} на {location} ({log_msg_detail}), осталось {time_left_str}")
+                            # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
                             continue # Переходим к следующему окну
 
 
@@ -313,7 +330,7 @@ async def cmd_start(message: types.Message):
         # 4. Телеграмм канал
         [types.InlineKeyboardButton(text="Телеграмм канал", url=LINKS["telegram"])], # Использует URL из словаря LINKS
         # 5. Обратная связь (ссылка)
-        # ЗАМЕНИТЕ "https://t.me/Silovik_ttv" НА РЕАЛЬНУЮ ССЫЛКУ
+        # ЗАМЕНИТЕ "https://t.me/your_telegram_username" НА РЕАЛЬНУЮ ССЫЛКУ
         [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/Silovik_ttv")], # <-- Замените на вашу ссылку
         # 6. Поддержка бота
         [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])], # Использует URL из словаря LINKS
@@ -433,7 +450,7 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
         logger.info("Сообщение отредактировано: возврат в главное меню.")
     except Exception as e:
         logger.warning(f"Не удалось отредактировать сообщение для возврата в главное меню: {e}.")
-        # Если редактирование не удалось, отправим новое сообщение с главным меню
+        # Если редактировать не получилось, отправим новое сообщение с главным меню
         await callback_query.message.answer(
             f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
             reply_markup=keyboard
@@ -449,7 +466,7 @@ def format_event_message(events, event_type="active"):
              # parse_mode='HTML', так что используем теги
              return f"<b>🔴 Нет активных событий.</b>\n"
         else: # Для предстоящих, если список пуст, просто не выводим заголовок
-             return "" # или f"<b>🟡 Нет предстоящих событий в ближайшее время.</b>\n" если нужно сообщение
+             return "" # или f"Нет предстоящих событий в ближайшее время.\n" если нужно сообщение
 
     # Выбираем заголовок с эмодзи
     # parse_mode='HTML', так что используем теги
@@ -473,7 +490,7 @@ def format_event_message(events, event_type="active"):
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении, редактированием сообщений и формой обратной связи...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
