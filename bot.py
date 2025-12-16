@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext  # <-- Импортирован FSMContext
-from aiogram.fsm.state import State, StatesGroup  # <-- Импортирован StatesGroup
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- Добавляем класс состояний для обратной связи ---
@@ -21,8 +21,7 @@ if not BOT_TOKEN:
 # Укажите ваш Telegram ID (число), чтобы получать сообщения. Найти можно, например, через @userinfobot
 YOUR_TELEGRAM_ID = 123456789 # ЗАМЕНИТЕ НА СВОЙ ЧИСЛОВОЙ ID
 
-# Убран лишний пробел в конце URL
-EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers' # <-- Исправлено: убран пробел
+EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
 
 # --- Настройка логирования ---
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # --- Инициализация бота ---
 bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage() # Используем MemoryStorage, как и раньше
+storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 # --- Словари перевода ---
@@ -59,51 +58,26 @@ MAP_TRANSLATIONS = {
 }
 
 # --- Ссылки для кнопок ---
-# Убраны лишние пробелы в конце URL
 LINKS = {
-    "streams": "https://www.twitch.tv/silovik_",  # Замените на реальную ссылку
-    "telegram": "https://t.me/silovik_stream", # Пример, замените на реальную ссылку
-    "support": "https://dalink.to/silovik_", # Пример, замените на реальную ссылку
-    # "update": "https://www.arcraiders.com/patch-notes", # Убрана, так как теперь текст
+    "streams": "https://www.twitch.tv/silovik_",
+    "telegram": "https://t.me/silovik_stream",
+    "support": "https://dalink.to/silovik_",
 }
 
 # --- Текст для обновления игры ---
-# Впишите сюда текст, который будет отправляться при нажатии кнопки "Обновление игры"
 GAME_UPDATE_TEXT = """
-<strong>КРУПНОЕ ОБНОВЛЕНИЕ 1.7.0 В ARC RAIDERS!</strong> (11.12.2025)
+<strong>ИНФОРМАЦИЯ ОТ РАЗРАБОТЧИКОВ ARC RAIDERS!</strong> (11.12.2025)
 
-🔉 <strong>Обновление 1.7.0:</strong>
--Если кратко добавили:
-
-🌟Условие карты «Заморозки»;
-🌟Событие «Мерцающее огоньки»;
-🌟Новая бесплатная колода рейдеров «Вратарь» — появится 26 декабря;
-🌟Новые задания и предметы;
-🌟Добавлена функция сброса дерева навыков.
-
-Другие моменты патча:
-
-🌟Добавлен альтернативный вариант прицеливания (переключение вместо удержания).
-🌟В кошельке теперь отображается лимит кредитов (800).
-🌟Различные праздничные предметы, которые помогут вам проникнуться духом праздника.
-🌟Чертёж Афелия теперь выпадает на карте Стелле Монтис, больше не выпадает из Матриарха.
-🌟Добавлена кастомизация инструмента рейдера.
-🌟Исправлены различные проблемы с коллизиями на картах.
-🌟Улучшена проверка расстояния до точки появления в Стелле Монтис, чтобы решить проблему, когда игроки появляются слишком близко друг к другу.
-
-Изменения баланса оружия:
-
-Беттина - (Скорость снижения прочности снижена с ~0,43 % до ~0,17 % за выстрел, на практике для полного исчерпания прочности требовалось около 12 полных магазинов, но теперь для этого нужно 26 (с учётом увеличенного размера магазина), размер базового магазина увеличен с 20 до 22, время перезарядки уменьшено с 5 до 4,5).
-
-Эти изменения направлены на то, чтобы сделать Беттину менее зависимой от дополнительного оружия. Теперь это оружие должно быть более эффективным в PvP, но не слишком. Данные показывают, что это оружие по-прежнему является одним из самых эффективных в PvE при своей редкости. 
-
-Трещётка - (Размер базового магазина увеличен с 10 до 12).
+🔉 <strong>Информация:</strong>
+-Разработчики Arc Raiders запустили опрос о картах
+ Его можно пройти тут:
+https://id.embark.games/id/arc-raiders/survey  
 """
 
 # --- Функции для получения и обработки данных из API ---
 
 def get_arc_raiders_events_from_api_calculated():
-    """Получает события из API MetaForge и вычисляет активные/предстоящие на основе расписания."""
+    """Получает события из API MetaForge и вычисляет активные/предстоящие на основе расписания HH:MM."""
     try:
         response = requests.get(EVENT_TIMERS_API_URL)
         response.raise_for_status()
@@ -123,49 +97,156 @@ def get_arc_raiders_events_from_api_calculated():
         for event_obj in raw_events:
             name = event_obj.get('name', 'Unknown Event')
             location = event_obj.get('map', 'Unknown Location')
-            # В новом API times нет, вместо этого startTime и endTime
-            start_timestamp_ms = event_obj.get('startTime')
-            end_timestamp_ms = event_obj.get('endTime')
+            # --- ИЗМЕНЕНО: Получаем список times ---
+            times_list = event_obj.get('times', [])
 
-            if not start_timestamp_ms or not end_timestamp_ms:
-                logger.warning(f"Missing start or end timestamp for event {name} at {location}")
-                continue
+            # --- ИЗМЕНЕНО: Проходим по каждому временному окну события на этой карте ---
+            for time_window in times_list:
+                start_str = time_window.get('start') # Например, "01:00"
+                end_str = time_window.get('end')     # Например, "02:00" или "24:00"
 
-            try:
-                # Конвертируем миллисекунды в datetime объект (в UTC)
-                start_dt = datetime.fromtimestamp(start_timestamp_ms / 1000, tz=timezone.utc)
-                end_dt = datetime.fromtimestamp(end_timestamp_ms / 1000, tz=timezone.utc)
-
-                # --- Вычисление активности ---
-                # Событие активно, если текущее время попадает в интервал [start_dt, end_dt)
-                if start_dt <= current_time_utc < end_dt:
-                    # Вычисляем оставшееся время до окончания
-                    time_left = end_dt - current_time_utc
-                    total_seconds = int(time_left.total_seconds())
-                    hours, remainder = divmod(total_seconds, 3600)
-                    minutes, seconds = divmod(remainder, 60)
-                    time_parts = []
-                    if hours > 0: time_parts.append(f"{hours}ч")
-                    if minutes > 0: time_parts.append(f"{minutes}м")
-                    if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
-                    time_left_str = " ".join(time_parts)
-
-                    active_events.append({
-                        'name': name,
-                        'location': location,
-                        'time_left': time_left_str,
-                        'end_time': end_dt
-                    })
-                    logger.info(f"Добавлено активное событие (по времени): {name} на {location}, осталось {time_left_str}")
-                    # Переходим к следующему событию, т.к. активное уже найдено для этого (name, location)
+                if not start_str or not end_str:
+                    logger.warning(f"Missing start or end time for event {name} at {location}")
                     continue
 
-                # --- Вычисление предстоящего ---
-                # Если не активно, проверяем, является ли это окно ближайшим предстоящим
-                # Событие предстоит, если его start_dt > current_time_utc
-                if start_dt > current_time_utc:
-                    # Вычисляем время до начала
-                    time_to_start = start_dt - current_time_utc
+                try:
+                    # Парсим время начала
+                    start_time = datetime.strptime(start_str, '%H:%M').time() # <-- offset-naive time object
+
+                    # --- ИСПРАВЛЕНИЕ ДЛЯ 24:00 ---
+                    if end_str == "24:00":
+                        # Интерпретируем 24:00 как конец текущего дня (23:59:59.999...)
+                        # Для логики сравнения времени в пределах дня, используем 23:59:59
+                        # или обрабатываем особым образом при вычислении end_datetime.
+                        # Лучше сразу перейти к вычислению end_datetime.
+                        is_end_midnight_next_day = True
+                        # Для сравнения времени в пределах дня (current_time_only)
+                        # end_time_for_comparison = time(23, 59, 59)
+                        # Но для случая 23:00 - 24:00, current_time_only < 24:00 всегда True
+                        # Поэтому логика активности для start <= current < end (где end=24:00)
+                        # становится: start <= current_time_only (до конца дня)
+                    else:
+                        end_time_for_comparison = datetime.strptime(end_str, '%H:%M').time()
+                        is_end_midnight_next_day = False
+                    # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
+                    # --- Вычисление активности ---
+                    # Случай 1: start и end в один день (например, 01:00 - 02:00) или start и 24:00 (например, 23:00 - 24:00)
+                    if start_time <= end_time_for_comparison or is_end_midnight_next_day:
+                        # Для 24:00: start_time <= current_time_only (до конца дня)
+                        # Для обычного: start_time <= current_time_only < end_time_for_comparison
+                        if is_end_midnight_next_day:
+                            # Событие активно, если start <= current_time_only и окно до конца дня
+                            is_active = start_time <= current_time_only
+                        else:
+                            # Событие активно, если start <= current_time_only < end
+                            is_active = start_time <= current_time_only < end_time_for_comparison
+
+                        if is_active:
+                            # Событие активно сегодня
+                            # Вычисляем время окончания как datetime объект (на сегодня, в UTC)
+                            # datetime.combine создает offset-naive datetime, нужно сделать его aware
+                            # Для 24:00 - это конец текущего дня, т.е. 00:00 следующего дня
+                            if is_end_midnight_next_day:
+                                # Окончание в 24:00 означает 00:00 следующего дня
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), datetime.min.time()) # time(0, 0)
+                            else:
+                                end_datetime_naive = datetime.combine(current_date_utc, end_time_for_comparison)
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+
+                            # Проверяем, что end_datetime > current_time_utc, иначе добавляем день (маловероятно для 24:00, но на всякий)
+                            if end_datetime <= current_time_utc:
+                                logger.warning(f"End time {end_datetime} is <= current time {current_time_utc}, adding 1 day.")
+                                if is_end_midnight_next_day:
+                                     end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=2), datetime.min.time())
+                                else:
+                                     end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time_for_comparison)
+                                end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc)
+
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
+                            total_seconds = int(time_left.total_seconds())
+                            hours, remainder = divmod(total_seconds, 3600)
+                            minutes, seconds = divmod(remainder, 60)
+                            time_parts = []
+                            if hours > 0: time_parts.append(f"{hours}ч")
+                            if minutes > 0: time_parts.append(f"{minutes}м")
+                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
+                            time_left_str = " ".join(time_parts)
+
+                            active_events.append({
+                                'name': name,
+                                'location': location,
+                                'time_left': time_left_str,
+                                'end_time': end_datetime
+                            })
+                            logger.info(f"Добавлено активное событие (сегодня): {name} на {location}, осталось {time_left_str}")
+                            # Переходим к следующему окну, т.к. активное уже найдено для этого (name, location)
+                            continue
+
+                    # Случай 2: start > end (например, 23:00 - 01:00 -> событие пересекает полночь)
+                    else: # start_time > end_time_for_comparison (и не 24:00)
+                        if (current_time_only >= start_time) or (current_time_only < end_time_for_comparison):
+                            # Событие активно сегодня или перешло на завтра
+                            # Вычисляем время окончания
+                            # Если текущее время >= start_time, значит событие началось сегодня и закончится завтра
+                            if current_time_only >= start_time:
+                                end_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), end_time_for_comparison)
+                            else: # current_time_only < end_time_for_comparison -> событие началось вчера и заканчивается сегодня
+                                end_datetime_naive = datetime.combine(current_date_utc, end_time_for_comparison)
+
+                            end_datetime = end_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+                            time_left = end_datetime - current_time_utc # <-- Теперь оба aware
+                            total_seconds = int(time_left.total_seconds())
+                            hours, remainder = divmod(total_seconds, 3600)
+                            minutes, seconds = divmod(remainder, 60)
+                            time_parts = []
+                            if hours > 0: time_parts.append(f"{hours}ч")
+                            if minutes > 0: time_parts.append(f"{minutes}м")
+                            if seconds > 0 or not time_parts: time_parts.append(f"{seconds}с")
+                            time_left_str = " ".join(time_parts)
+
+                            active_events.append({
+                                'name': name,
+                                'location': location,
+                                'time_left': time_left_str,
+                                'end_time': end_datetime
+                            })
+                            logger.info(f"Добавлено активное событие (переходящее): {name} на {location}, осталось {time_left_str}")
+                            continue # Переходим к следующему окну
+
+
+                    # --- Вычисление предстоящего ---
+                    # Если не активно, ищем ближайшее время начала
+                    # Случай 1: start и end в один день (например, 01:00 - 02:00) или start и 24:00 (например, 23:00 - 24:00)
+                    if start_time <= end_time_for_comparison or is_end_midnight_next_day:
+                        if is_end_midnight_next_day:
+                            # Если событие заканчивается в 24:00, оно начинается сегодня и заканчивается завтра.
+                            # Если оно уже началось (start <= current), то оно активно (обработано выше).
+                            # Если оно еще не началось (current < start), то начнётся сегодня.
+                            if current_time_only < start_time: # Начнётся сегодня
+                                start_datetime_naive = datetime.combine(current_date_utc, start_time)
+                            else: # Уже началось, но активность не прошла (была бы выше), значит что-то не так с логикой или время на секунду изменилось.
+                                 # На всякий случай, если current_time == start_time и оно не активно, ищем следующий день
+                                 # Но это маловероятно, т.к. start <= current < 24:00 означает активность.
+                                 # Если всё же не активно, ищем следующий день.
+                                 start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+                        else:
+                            if start_time > current_time_only: # Начнётся сегодня
+                                start_datetime_naive = datetime.combine(current_date_utc, start_time)
+                            else: # Началось сегодня, но уже прошло, ищем на завтра
+                                start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+
+                    # Случай 2: start > end (например, 23:00 - 01:00)
+                    else: # start_time > end_time_for_comparison
+                        if current_time_only < start_time and current_time_only >= end_time_for_comparison: # Событие еще не началось сегодня (например, 22:00, а старт в 23:00)
+                            start_datetime_naive = datetime.combine(current_date_utc, start_time)
+                        else: # Событие уже прошло сегодня, ищем на завтра или позже
+                            start_datetime_naive = datetime.combine(current_date_utc + timedelta(days=1), start_time)
+
+                    # Сделать start_datetime aware
+                    start_datetime = start_datetime_naive.replace(tzinfo=timezone.utc) # <-- offset-aware
+
+                    time_to_start = start_datetime - current_time_utc # <-- Теперь оба aware
                     total_seconds = int(time_to_start.total_seconds())
                     hours, remainder = divmod(total_seconds, 3600)
                     minutes, seconds = divmod(remainder, 60)
@@ -177,19 +258,20 @@ def get_arc_raiders_events_from_api_calculated():
 
                     # Проверяем, является ли это окно ближайшим для данной пары (name, location)
                     key = (name, location)
-                    if key not in next_upcoming_for_location or start_dt < next_upcoming_for_location[key]['start_time']:
+                    if key not in next_upcoming_for_location or start_datetime < next_upcoming_for_location[key]['start_time']:
                         next_upcoming_for_location[key] = {
                             'time_left': time_to_start_str,
-                            'start_time': start_dt # <-- Убедиться, что это aware
+                            'start_time': start_datetime # <-- Убедиться, что это aware
                         }
-                        logger.info(f"Найдено предстоящее событие для {name} на {location}, начнётся через {time_to_start_str} ({start_dt.strftime('%Y-%m-%d %H:%M:%S UTC')})")
+                        logger.info(f"Найдено предстоящее событие для {name} на {location}, начнётся через {time_to_start_str} ({start_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')})")
 
-            except ValueError as e:
-                logger.error(f"Error parsing timestamp for event {name} at {location}: {start_timestamp_ms}, {end_timestamp_ms}. Error: {e}")
-                continue # Переходим к следующему событию
-            except Exception as e:
-                logger.error(f"Unexpected error processing time for event {name} at {location}: {start_timestamp_ms}, {end_timestamp_ms}. Error: {e}")
-                continue # Переходим к следующему событию
+                except ValueError as e:
+                    logger.error(f"Error parsing time for event {name} at {location}: {start_str}, {end_str}. Error: {e}")
+                    # Пропускаем это окно, если ошибка парсинга (например, из-за 24:00 без обработки)
+                    continue # Переходим к следующему окну
+                except Exception as e:
+                    logger.error(f"Unexpected error processing time for event {name} at {location}: {start_str}, {end_str}. Error: {e}")
+                    continue # Переходим к следующему окну
 
         # После обработки всех событий, добавляем ближайшие предстоящие из словаря
         for (name, location), event_info in next_upcoming_for_location.items():
@@ -230,7 +312,7 @@ async def cmd_start(message: types.Message):
         # 4. Телеграмм канал
         [types.InlineKeyboardButton(text="Телеграмм канал", url=LINKS["telegram"])], # Использует URL из словаря LINKS
         # 5. Обратная связь (ссылка)
-        # ЗАМЕНИТЕ "https://t.me/Silovik_ttv" НА РЕАЛЬНУЮ ССЫЛКУ
+        # ЗАМЕНИТЕ "https://t.me/your_telegram_username" НА РЕАЛЬНУЮ ССЫЛКУ
         [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/Silovik_ttv")], # <-- Замените на вашу ссылку
         # 6. Поддержка бота
         [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])], # Использует URL из словаря LINKS
@@ -269,21 +351,20 @@ async def process_callback_game_update(callback_query: types.CallbackQuery):
         )
     await callback_query.answer()
 
+# --- НОВОЕ: Обработчики для обратной связи (не используется в этом варианте, но можно добавить FSM) ---
+
 # Обработчик для событий (ИЗМЕНЁН)
 @dp.callback_query(lambda c: c.data == 'events')
 async def process_callback_events(callback_query: types.CallbackQuery):
     # Теперь вызываем send_events_message с edit=True
-    # Это означает, что бот попытается ОТРЕДАКТИРОВАТЬ сообщение, в котором была нажата кнопка 'events'
-    # (обычно это главное меню или меню обновления)
+    # Это заставит send_events_message попытаться ОТРЕДАКТИРОВАТЬ callback_query.message
+    # (сообщение с главным меню, в котором была нажата кнопка "События")
     await send_events_message(callback_query.message, edit=True)
-    await callback_query.answer() # Отвечаем на callback_query
+    await callback_query.answer()
 
 # Функция отправки или редактирования сообщения с событиями
 async def send_events_message(message: types.Message, edit: bool = False):
-    # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ -->
-    logger.info("Вызов send_events_message")
     active, upcoming = get_arc_raiders_events_from_api_calculated()
-    logger.info(f"Получено из API: {len(active)} активных, {len(upcoming)} предстоящих.")
 
     # Форматируем активные события
     active_message = format_event_message(active, "active")
@@ -297,33 +378,27 @@ async def send_events_message(message: types.Message, edit: bool = False):
 
     # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        # <-- ПРОВЕРКА: callback_data="refresh_events"
-        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")],
-        # <-- ПРОВЕРКА: callback_data="start_menu"
-        [types.InlineKeyboardButton(text="Назад", callback_data="start_menu")]
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")], # Изменили callback
+        [types.InlineKeyboardButton(text="Назад", callback_data="start_menu")] # <-- Изменено
     ])
 
     if edit:
         # Пытаемся отредактировать существующее сообщение
         try:
-            # parse_mode изменён на HTML
             await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='HTML')
             logger.info("Сообщение с событиями отредактировано.")
         except Exception as e:
             # Если не получилось отредактировать (например, сообщение слишком старое), отправим новое
             logger.warning(f"Не удалось отредактировать сообщение: {e}. Отправляем новое.")
-            # parse_mode изменён на HTML
             await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
     else:
         # Отправляем новое сообщение
-        # parse_mode изменён на HTML
         await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
 
 # Новый обработчик для обновления (редактирования) сообщения с событиями
 @dp.callback_query(lambda c: c.data == 'refresh_events')
 async def process_callback_refresh_events(callback_query: types.CallbackQuery):
     # Вызываем send_events_message с edit=True
-    logger.info("Обработка callback 'refresh_events'") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
     await send_events_message(callback_query.message, edit=True)
     # ВАЖНО: НЕ вызываем callback_query.answer() сразу, потому что edit_text может занять время
     # aiogram сам вызовет answer, если edit_text прошёл успешно.
@@ -350,7 +425,7 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
         [types.InlineKeyboardButton(text="Twitch", url=LINKS["streams"])],
         [types.InlineKeyboardButton(text="Телеграмм канал", url=LINKS["telegram"])],
         [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/Silovik_ttv")], # <-- Замените на вашу ссылку
-        [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])],
+        [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])]
     ])
     try:
         # Пытаемся отредактировать сообщение (список событий или обновление) и заменить его на главное меню
@@ -368,20 +443,18 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
         )
     await callback_query.answer() # Отвечаем на callback_query
 
-# --- Форматирование сообщения с переводом, без ограничения и с эмодзи (HTML) ---
+# --- Форматирование сообщения с переводом, без ограничения и с улучшенным оформлением (HTML) ---
 def format_event_message(events, event_type="active"):
     """Форматирует список событий в текстовое сообщение с переводом и эмодзи (HTML)."""
     if not events:
         # Если список пуст, возвращаем пустую строку или сообщение, только если это активные
         if event_type == "active":
-             # parse_mode='HTML', так что используем теги
-             return f"Нет активных событий.\n"
+             return f"<b>🔴 Нет активных событий.</b>\n"
         else: # Для предстоящих, если список пуст, просто не выводим заголовок
-             return "" # или f"Нет предстоящих событий в ближайшее время.\n" если нужно сообщение
+             return "" # или f"<b>🟡 Нет предстоящих событий в ближайшее время.</b>\n" если нужно сообщение
 
-    # Выбираем заголовок с эмодзи
-    # parse_mode='HTML', так что используем теги
-    header = "<strong>🟢 Активные события:</strong>\n" if event_type == "active" else "<strong>🔴 Предстоящие события:</strong>\n"
+    # Выбираем заголовок с эмодзи и выделением
+    header = "<b>🟢 Активные события:</b>\n" if event_type == "active" else "<b>🔴 Предстоящие события:</b>\n"
     message = header
     for event in events:
         # Получаем перевод или оставляем оригинальное имя, если перевод не найден
@@ -389,19 +462,14 @@ def format_event_message(events, event_type="active"):
         translated_location = MAP_TRANSLATIONS.get(event['location'], event['location'])
 
         if event_type == "active":
-            # parse_mode='HTML', используем теги <strong> и <em>
-            # <em> для курсива, <strong> для жирного
-            # translated_name будет курсивом, location - жирным
-            message += f"- <em>{translated_name}</em> на карте <strong>{translated_location}</strong> (осталось: {event['time_left']})\n"
+            message += f"• <b>{translated_name}</b> на карте <b>{translated_location}</b> (осталось: <i>{event['time_left']}</i>)\n"
         else:
-            # parse_mode='HTML', используем теги <strong>
-            # translated_name и location будут жирными
-            message += f"- <strong>{translated_name}</strong> на карте <strong>{translated_location}</strong> (начнётся через: {event['time_left']})\n"
+            message += f"• <b>{translated_name}</b> на карте <b>{translated_location}</b> (начнётся через: <i>{event['time_left']}</i>)\n"
     return message
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении, редактированием сообщений и формой обратной связи...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
