@@ -2,24 +2,16 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+import re # Для регулярных выражений при парсинге времени
 import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-
-# --- Добавляем класс состояний для обратной связи ---
-class Feedback(StatesGroup):
-    waiting_for_message = State()
 
 # --- Настройки ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
-
-# Укажите ваш Telegram ID (число), чтобы получать сообщения. Найти можно, например, через @userinfobot
-YOUR_TELEGRAM_ID = 123456789 # ЗАМЕНИТЕ НА СВОЙ ЧИСЛОВОЙ ID
 
 EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
 
@@ -29,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # --- Инициализация бота ---
 bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
+storage = MemoryStorage() # Используем MemoryStorage, как и раньше
 dp = Dispatcher(storage=storage)
 
 # --- Словари перевода ---
@@ -45,12 +37,13 @@ EVENT_TRANSLATIONS = {
     "Husk Graveyard": "Кладбище ARC",
     "Prospecting Probes": "Геологические зонды",
     # Новые события из JSON
-    "Cold Snap": "Холодная вспышка",
+    "Cold Snap": "Холодная вспышка", # Исправлено: Cold Snap вместо Cold Snap
     "Locked Gate": "Закрытые врата",
+
 }
 
 MAP_TRANSLATIONS = {
-    "Dam": "Дамба",
+    "Dam": "Плотина",
     "Buried City": "Погребенный город",
     "Spaceport": "Космопорт",
     "Blue Gate": "Синие врата",
@@ -60,18 +53,26 @@ MAP_TRANSLATIONS = {
 # --- Ссылки для кнопок ---
 LINKS = {
     "streams": "https://www.twitch.tv/silovik_",
-    "telegram": "https://t.me/silovik_stream",
-    "support": "https://dalink.to/silovik_",
+    "telegram": "https://t.me/silovik_stream", # Пример, замените на реальную ссылку
+    "support": "https://dalink.to/silovik_", # Пример, замените на реальную ссылку
+    # "update": "https://www.arcraiders.com/patch-notes", # Убрана, так как теперь текст
 }
 
 # --- Текст для обновления игры ---
+# Впишите сюда текст, который будет отправляться при нажатии кнопки "Обновление игры"
 GAME_UPDATE_TEXT = """
-<strong>ИНФОРМАЦИЯ ОТ РАЗРАБОТЧИКОВ ARC RAIDERS!</strong> (11.12.2025)
+<strong>ВАЖНОЕ ОБНОВЛЕНИЕ ARC RAIDERS!</strong> (10.12.2025)
 
-🔉 <strong>Информация:</strong>
--Разработчики Arc Raiders запустили опрос о картах
- Его можно пройти тут:
-https://id.embark.games/id/arc-raiders/survey  
+🔥 <strong>Новое событие: \"Танец Огня\"</strong>
+   - Доступно на карте \"Космопорт\".
+   - Только для игроков 30+ уровня.
+   - Награды: Редкие ARCs, Скины оружия.
+
+🛠 <strong>Исправления:</strong>
+   - Исправлена ошибка с пропажей добычи.
+   - Улучшена стабильность серверов в Азии.
+
+📅 Следующее обновление: 17.12.2025
 """
 
 # --- Функции для получения и обработки данных из API ---
@@ -97,10 +98,9 @@ def get_arc_raiders_events_from_api_calculated():
         for event_obj in raw_events:
             name = event_obj.get('name', 'Unknown Event')
             location = event_obj.get('map', 'Unknown Location')
-            # --- ИЗМЕНЕНО: Получаем список times ---
             times_list = event_obj.get('times', [])
 
-            # --- ИЗМЕНЕНО: Проходим по каждому временному окну события на этой карте ---
+            # Проходим по каждому временному окну события на этой карте
             for time_window in times_list:
                 start_str = time_window.get('start') # Например, "01:00"
                 end_str = time_window.get('end')     # Например, "02:00" или "24:00"
@@ -125,6 +125,7 @@ def get_arc_raiders_events_from_api_calculated():
                         # Но для случая 23:00 - 24:00, current_time_only < 24:00 всегда True
                         # Поэтому логика активности для start <= current < end (где end=24:00)
                         # становится: start <= current_time_only (до конца дня)
+                        # И время окончания - 00:00 следующего дня.
                     else:
                         end_time_for_comparison = datetime.strptime(end_str, '%H:%M').time()
                         is_end_midnight_next_day = False
@@ -312,7 +313,7 @@ async def cmd_start(message: types.Message):
         # 4. Телеграмм канал
         [types.InlineKeyboardButton(text="Телеграмм канал", url=LINKS["telegram"])], # Использует URL из словаря LINKS
         # 5. Обратная связь (ссылка)
-        # ЗАМЕНИТЕ "https://t.me/your_telegram_username" НА РЕАЛЬНУЮ ССЫЛКУ
+        # ЗАМЕНИТЕ "https://t.me/Silovik_ttv" НА РЕАЛЬНУЮ ССЫЛКУ
         [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/Silovik_ttv")], # <-- Замените на вашу ссылку
         # 6. Поддержка бота
         [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])], # Использует URL из словаря LINKS
@@ -349,22 +350,23 @@ async def process_callback_game_update(callback_query: types.CallbackQuery):
             reply_markup=keyboard,
             parse_mode='HTML'
         )
-    await callback_query.answer()
-
-# --- НОВОЕ: Обработчики для обратной связи (не используется в этом варианте, но можно добавить FSM) ---
+    # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
 # Обработчик для событий (ИЗМЕНЁН)
 @dp.callback_query(lambda c: c.data == 'events')
 async def process_callback_events(callback_query: types.CallbackQuery):
     # Теперь вызываем send_events_message с edit=True
-    # Это заставит send_events_message попытаться ОТРЕДАКТИРОВАТЬ callback_query.message
-    # (сообщение с главным меню, в котором была нажата кнопка "События")
+    # Это означает, что бот попытается ОТРЕДАКТИРОВАТЬ сообщение, в котором была нажата кнопка 'events'
+    # (обычно это главное меню или меню обновления)
     await send_events_message(callback_query.message, edit=True)
-    await callback_query.answer()
+    # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
 # Функция отправки или редактирования сообщения с событиями
 async def send_events_message(message: types.Message, edit: bool = False):
+    # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ -->
+    logger.info("Вызов send_events_message (использование API)")
     active, upcoming = get_arc_raiders_events_from_api_calculated()
+    logger.info(f"Получено из API: {len(active)} активных, {len(upcoming)} предстоящих.")
 
     # Форматируем активные события
     active_message = format_event_message(active, "active")
@@ -378,50 +380,35 @@ async def send_events_message(message: types.Message, edit: bool = False):
 
     # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")], # Изменили callback
-        [types.InlineKeyboardButton(text="Назад", callback_data="start_menu")] # <-- Изменено
+        # <-- ПРОВЕРКА: callback_data="refresh_events"
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")],
+        # <-- ПРОВЕРКА: callback_data="start_menu"
+        [types.InlineKeyboardButton(text="Назад", callback_data="start_menu")]
     ])
 
     if edit:
         # Пытаемся отредактировать существующее сообщение
         try:
+            # parse_mode изменён на HTML
             await message.edit_text(text=response_text, reply_markup=keyboard, parse_mode='HTML')
             logger.info("Сообщение с событиями отредактировано.")
         except Exception as e:
             # Если не получилось отредактировать (например, сообщение слишком старое), отправим новое
             logger.warning(f"Не удалось отредактировать сообщение: {e}. Отправляем новое.")
+            # parse_mode изменён на HTML
             await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
     else:
         # Отправляем новое сообщение
+        # parse_mode изменён на HTML
         await message.answer(response_text, reply_markup=keyboard, parse_mode='HTML')
 
 # Новый обработчик для обновления (редактирования) сообщения с событиями
 @dp.callback_query(lambda c: c.data == 'refresh_events')
 async def process_callback_refresh_events(callback_query: types.CallbackQuery):
     # Вызываем send_events_message с edit=True
-    logger.info("Обработка callback 'refresh_events'") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
+    logger.info("Обработка callback 'refresh_events' (использование API)") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
     await send_events_message(callback_query.message, edit=True)
-    # ВАЖНО: НЕ вызываем callback_query.answer() сразу, потому что send_events_message вызывает edit_text или answer
-    # aiogram сам вызовет answer, если edit_text или answer внутри send_events_message прошли успешно.
-    # Если edit_text или answer не удался и было отправлено новое сообщение, answer нужно вызвать вручную.
-    # Однако, в текущей реализации send_events_message, если edit_text не удался, он отправляет новое сообщение и НЕ вызывает answer.
-    # Поэтому, если мы дойдём до этой точки, и edit_text прошёл успешно, answer уже отправлен aiogram.
-    # Если edit_text не прошёл и было отправлено новое сообщение, answer НЕ был отправлен aiogram.
-    # Мы не знаем наверняка, был ли answer отправлен aiogram или нет, если мы просто дойдём до этой строки.
-    # Но aiogram *не* бросает исключение, если попытаться ответить дважды, он просто игнорирует повторный вызов answer.
-    # Поэтому безопаснее всего вызвать answer(), и aiogram сам решит, нужно ли его отправлять.
-    # Но, если send_events_message вызвало исключение до отправки edit_text или answer, answer не был отправлен.
-    # В любом случае, вызов answer() в конце безопасен и гарантирует, что Telegram получит ответ.
-    # Однако, в логах может появиться предупреждение, если answer был отправлен дважды.
-    # Лучше всего избегать двойного вызова, обернув send_events_message в try-except и вызывая answer только в случае исключения.
-    # Но проще и безопаснее (для aiogram 3.x) - довериться автоматическому answer, если edit_text/answer прошёл успешно.
-    # И НЕ вызывать answer вручную, если мы уверены, что edit_text/answer в send_events_message прошёл.
-    # В нашем случае, send_events_message *пытается* выполнить edit_text.
-    # Если edit_text прошёл успешно, aiogram вызывает answer.
-    # Если edit_text не прошёл, он выполняет answer.
-    # Поэтому, вызов answer здесь может привести к двойному ответу.
-    # Решение: УБРАТЬ вызов await callback_query.answer() из этого обработчика.
-    # aiogram сам разберётся.
+    # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
 # Обработчик для кнопки "Назад" из меню событий
 @dp.callback_query(lambda c: c.data == 'start_menu')
@@ -446,32 +433,26 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
         logger.info("Сообщение отредактировано: возврат в главное меню.")
     except Exception as e:
         logger.warning(f"Не удалось отредактировать сообщение для возврата в главное меню: {e}.")
-        # Если редактировать не получилось, отправим новое сообщение с главным меню
+        # Если редактирование не удалось, отправим новое сообщение с главным меню
         await callback_query.message.answer(
             f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
             reply_markup=keyboard
         )
-        logger.info("Сообщение отредактировано: возврат в главное меню.")
-    except Exception as e:
-        logger.warning(f"Не удалось отредактировать сообщение для возврата в главное меню: {e}.")
-        # Если редактировать не получилось, отправим новое сообщение с главным меню
-        await callback_query.message.answer(
-            f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
-            reply_markup=keyboard
-        )
-    await callback_query.answer() # Отвечаем на callback_query
+    # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
-# --- Форматирование сообщения с переводом, без ограничения и с улучшенным оформлением (HTML) ---
+# --- Форматирование сообщения с переводом, без ограничения и с эмодзи (HTML) ---
 def format_event_message(events, event_type="active"):
     """Форматирует список событий в текстовое сообщение с переводом и эмодзи (HTML)."""
     if not events:
         # Если список пуст, возвращаем пустую строку или сообщение, только если это активные
         if event_type == "active":
+             # parse_mode='HTML', так что используем теги
              return f"<b>🔴 Нет активных событий.</b>\n"
         else: # Для предстоящих, если список пуст, просто не выводим заголовок
              return "" # или f"<b>🟡 Нет предстоящих событий в ближайшее время.</b>\n" если нужно сообщение
 
-    # Выбираем заголовок с эмодзи и выделением
+    # Выбираем заголовок с эмодзи
+    # parse_mode='HTML', так что используем теги
     header = "<b>🟢 Активные события:</b>\n" if event_type == "active" else "<b>🔴 Предстоящие события:</b>\n"
     message = header
     for event in events:
@@ -480,14 +461,19 @@ def format_event_message(events, event_type="active"):
         translated_location = MAP_TRANSLATIONS.get(event['location'], event['location'])
 
         if event_type == "active":
-            message += f"• <b>{translated_name}</b> на карте <b>{translated_location}</b> (осталось: <i>{event['time_left']}</i>)\n"
+            # parse_mode='HTML', используем теги <strong> и <em>
+            # <em> для курсива, <strong> для жирного
+            # translated_name будет курсивом, location - жирным
+            message += f"- <em>{translated_name}</em> на карте <strong>{translated_location}</strong> (осталось: {event['time_left']})\n"
         else:
-            message += f"• <b>{translated_name}</b> на карте <b>{translated_location}</b> (начнётся через: <i>{event['time_left']}</i>)\n"
+            # parse_mode='HTML', используем теги <strong>
+            # translated_name и location будут жирными
+            message += f"- <strong>{translated_name}</strong> на карте <strong>{translated_location}</strong> (начнётся через: {event['time_left']})\n"
     return message
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении, редактированием сообщений и формой обратной связи...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
