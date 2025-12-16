@@ -46,7 +46,10 @@ EVENT_TRANSLATIONS = {
     "Hidden Bunker": "Скрытый бункер",
     "Husk Graveyard": "Кладбище ARC",
     "Prospecting Probes": "Геологические зонды",
+    "Cold Snap": "Заморозка",
+    "Locked Gate": "Закрытые врата",
 }
+
 
 MAP_TRANSLATIONS = {
     "Dam": "Дамба",
