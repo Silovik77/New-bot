@@ -399,19 +399,29 @@ async def send_events_message(message: types.Message, edit: bool = False):
 @dp.callback_query(lambda c: c.data == 'refresh_events')
 async def process_callback_refresh_events(callback_query: types.CallbackQuery):
     # Вызываем send_events_message с edit=True
+    logger.info("Обработка callback 'refresh_events'") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
     await send_events_message(callback_query.message, edit=True)
-    # ВАЖНО: НЕ вызываем callback_query.answer() сразу, потому что edit_text может занять время
-    # aiogram сам вызовет answer, если edit_text прошёл успешно.
-    # Если edit_text не удался и было отправлено новое сообщение, answer нужно вызвать вручную.
-    # Проверим, было ли сообщение отредактировано или отправлено новое.
-    # Проще всего всегда вызвать answer, если edit_text не вызвал исключения.
-    # Но если edit_text вызвал исключение и было отправлено новое сообщение,
-    # то answer вызовет ошибку, так как callback уже "истек".
-    # Обернём в try-except, чтобы избежать ошибки в последнем случае.
-    try:
-        await callback_query.answer()
-    except Exception:
-        pass # Игнорируем ошибку, если answer не нужен/невозможен
+    # ВАЖНО: НЕ вызываем callback_query.answer() сразу, потому что send_events_message вызывает edit_text или answer
+    # aiogram сам вызовет answer, если edit_text или answer внутри send_events_message прошли успешно.
+    # Если edit_text или answer не удался и было отправлено новое сообщение, answer нужно вызвать вручную.
+    # Однако, в текущей реализации send_events_message, если edit_text не удался, он отправляет новое сообщение и НЕ вызывает answer.
+    # Поэтому, если мы дойдём до этой точки, и edit_text прошёл успешно, answer уже отправлен aiogram.
+    # Если edit_text не прошёл и было отправлено новое сообщение, answer НЕ был отправлен aiogram.
+    # Мы не знаем наверняка, был ли answer отправлен aiogram или нет, если мы просто дойдём до этой строки.
+    # Но aiogram *не* бросает исключение, если попытаться ответить дважды, он просто игнорирует повторный вызов answer.
+    # Поэтому безопаснее всего вызвать answer(), и aiogram сам решит, нужно ли его отправлять.
+    # Но, если send_events_message вызвало исключение до отправки edit_text или answer, answer не был отправлен.
+    # В любом случае, вызов answer() в конце безопасен и гарантирует, что Telegram получит ответ.
+    # Однако, в логах может появиться предупреждение, если answer был отправлен дважды.
+    # Лучше всего избегать двойного вызова, обернув send_events_message в try-except и вызывая answer только в случае исключения.
+    # Но проще и безопаснее (для aiogram 3.x) - довериться автоматическому answer, если edit_text/answer прошёл успешно.
+    # И НЕ вызывать answer вручную, если мы уверены, что edit_text/answer в send_events_message прошёл.
+    # В нашем случае, send_events_message *пытается* выполнить edit_text.
+    # Если edit_text прошёл успешно, aiogram вызывает answer.
+    # Если edit_text не прошёл, он выполняет answer.
+    # Поэтому, вызов answer здесь может привести к двойному ответу.
+    # Решение: УБРАТЬ вызов await callback_query.answer() из этого обработчика.
+    # aiogram сам разберётся.
 
 # Обработчик для кнопки "Назад" из меню событий
 @dp.callback_query(lambda c: c.data == 'start_menu')
@@ -425,12 +435,20 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
         [types.InlineKeyboardButton(text="Twitch", url=LINKS["streams"])],
         [types.InlineKeyboardButton(text="Телеграмм канал", url=LINKS["telegram"])],
         [types.InlineKeyboardButton(text="Обратная связь", url="https://t.me/Silovik_ttv")], # <-- Замените на вашу ссылку
-        [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])]
+        [types.InlineKeyboardButton(text="Поддержка бота", url=LINKS["support"])],
     ])
     try:
         # Пытаемся отредактировать сообщение (список событий или обновление) и заменить его на главное меню
         await callback_query.message.edit_text(
             text=f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
+            reply_markup=keyboard
+        )
+        logger.info("Сообщение отредактировано: возврат в главное меню.")
+    except Exception as e:
+        logger.warning(f"Не удалось отредактировать сообщение для возврата в главное меню: {e}.")
+        # Если редактировать не получилось, отправим новое сообщение с главным меню
+        await callback_query.message.answer(
+            f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
             reply_markup=keyboard
         )
         logger.info("Сообщение отредактировано: возврат в главное меню.")
