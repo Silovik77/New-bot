@@ -2,6 +2,7 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+import re # Для регулярных выражений при парсинге
 import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -12,8 +13,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
-# --- ИЗМЕНЁН URL API ---
-EVENT_SCHEDULE_API_URL = 'https://metaforge.app/api/arc-raiders/events-schedule'
+EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
 
 # --- Настройка логирования ---
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # --- Инициализация бота ---
 bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
+storage = MemoryStorage() # Используем MemoryStorage, как и раньше
 dp = Dispatcher(storage=storage)
 
 # --- Словари перевода ---
@@ -79,11 +79,10 @@ https://id.embark.games/id/arc-raiders/survey
 
 # --- Функции для получения и обработки данных из API ---
 
-def get_arc_raiders_events_from_api_schedule():
-    """Получает события из API MetaForge (events-schedule) и вычисляет активные/предстоящие на основе расписания HH:MM."""
+def get_arc_raiders_events_from_api_calculated():
+    """Получает события из API MetaForge и вычисляет активные/предстоящие на основе расписания HH:MM."""
     try:
-        # --- ИЗМЕНЁН URL ЗАПРОСА ---
-        response = requests.get(EVENT_SCHEDULE_API_URL)
+        response = requests.get(EVENT_TIMERS_API_URL)
         response.raise_for_status()
         data = response.json()
 
@@ -101,10 +100,9 @@ def get_arc_raiders_events_from_api_schedule():
         for event_obj in raw_events:
             name = event_obj.get('name', 'Unknown Event')
             location = event_obj.get('map', 'Unknown Location')
-            # --- ИЗМЕНЕНО: Получаем список times ---
             times_list = event_obj.get('times', [])
 
-            # --- ИЗМЕНЕНО: Проходим по каждому временному окну события на этой карте ---
+            # Проходим по каждому временному окну события на этой карте
             for time_window in times_list:
                 start_str = time_window.get('start') # Например, "01:00"
                 end_str = time_window.get('end')     # Например, "02:00" или "24:00"
@@ -306,14 +304,14 @@ def get_arc_raiders_events_from_api_schedule():
         # Сортировка будет корректной, так как start_time теперь aware
         upcoming_events.sort(key=lambda x: x['start_time'])
 
-        logger.info(f"Вычисление по API (schedule) завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
+        logger.info(f"Вычисление по API завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
         return active_events, upcoming_events
 
     except requests.RequestException as e:
-        logger.error(f"Ошибка при получении данных из API (schedule): {e}")
+        logger.error(f"Ошибка при получении данных из API: {e}")
         return [], []
     except Exception as e:
-        logger.error(f"Неожиданная ошибка при обработке данных из API (schedule): {e}")
+        logger.error(f"Неожиданная ошибка при обработке данных из API: {e}")
         return [], []
 
 # --- Обработчики команд и кнопок ---
@@ -378,15 +376,14 @@ async def process_callback_events(callback_query: types.CallbackQuery):
     # Это означает, что бот попытается ОТРЕДАКТИРОВАТЬ сообщение, в котором была нажата кнопка 'events'
     # (обычно это главное меню или меню обновления)
     await send_events_message(callback_query.message, edit=True)
-    await callback_query.answer() # Отвечаем на callback_query
+    # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
 # Функция отправки или редактирования сообщения с событиями
 async def send_events_message(message: types.Message, edit: bool = False):
     # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ -->
-    logger.info("Вызов send_events_message (использование API /events-schedule)")
-    # МЕНЯЕМ: вызываем get_arc_raiders_events_from_api_schedule вместо get_arc_raiders_events_from_api_calculated
-    active, upcoming = get_arc_raiders_events_from_api_schedule()
-    logger.info(f"Получено из API (schedule): {len(active)} активных, {len(upcoming)} предстоящих.")
+    logger.info("Вызов send_events_message (использование API)")
+    active, upcoming = get_arc_raiders_events_from_api_calculated()
+    logger.info(f"Получено из API: {len(active)} активных, {len(upcoming)} предстоящих.")
 
     # Форматируем активные события
     active_message = format_event_message(active, "active")
@@ -401,7 +398,7 @@ async def send_events_message(message: types.Message, edit: bool = False):
     # Клавиатура с кнопками "Обновить" и "Назад" (в главное меню)
     keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
         # <-- ПРОВЕРКА: callback_data="refresh_events"
-        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")], # Изменили callback
+        [types.InlineKeyboardButton(text="🔄 Обновить", callback_data="refresh_events")],
         # <-- ПРОВЕРКА: callback_data="start_menu"
         [types.InlineKeyboardButton(text="Назад", callback_data="start_menu")]
     ])
@@ -426,7 +423,7 @@ async def send_events_message(message: types.Message, edit: bool = False):
 @dp.callback_query(lambda c: c.data == 'refresh_events')
 async def process_callback_refresh_events(callback_query: types.CallbackQuery):
     # Вызываем send_events_message с edit=True
-    logger.info("Обработка callback 'refresh_events' (использование API /events-schedule)") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
+    logger.info("Обработка callback 'refresh_events' (использование API)") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
     await send_events_message(callback_query.message, edit=True)
     # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
@@ -458,7 +455,7 @@ async def process_callback_back_to_start(callback_query: types.CallbackQuery):
             f"Привет, {callback_query.from_user.first_name}! Выбери действие:",
             reply_markup=keyboard
         )
-    await callback_query.answer() # Отвечаем на callback_query
+    # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
 # --- Форматирование сообщения с переводом, без ограничения и с эмодзи (HTML) ---
 def format_event_message(events, event_type="active"):
@@ -493,7 +490,7 @@ def format_event_message(events, event_type="active"):
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием вычисленного таймера из API /events-schedule (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
+    logger.info("Запуск бота с использованием вычисленного таймера из API (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
