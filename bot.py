@@ -12,8 +12,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Переменная окружения BOT_TOKEN не задана!")
 
-# --- ИЗМЕНЁН URL API на event-timers ---
-EVENT_TIMERS_API_URL = 'https://metaforge.app/api/arc-raiders/event-timers'
+# --- ИЗМЕНЁН URL API на events-schedule ---
+EVENT_SCHEDULE_API_URL = 'https://metaforge.app/api/arc-raiders/events-schedule'
 
 # --- Настройка логирования ---
 logging.basicConfig(level=logging.INFO)
@@ -79,14 +79,14 @@ https://id.embark.games/id/arc-raiders/survey
 
 # --- Функции для получения и обработки данных из API ---
 
-def get_arc_raiders_events_from_api_timers():
+def get_arc_raiders_events_from_api_schedule():
     """
-    Получает события из API MetaForge (event-timers) и вычисляет
+    Получает события из API MetaForge (events-schedule) и вычисляет
     активные/предстоящие, проверяя формат ответа (startTime/endTime или times HH:MM).
     """
     try:
         # --- ИЗМЕНЁН URL ЗАПРОСА ---
-        response = requests.get(EVENT_TIMERS_API_URL)
+        response = requests.get(EVENT_SCHEDULE_API_URL)
         response.raise_for_status()
         data = response.json()
 
@@ -94,21 +94,21 @@ def get_arc_raiders_events_from_api_timers():
 
         # --- Проверка формата: если есть startTime/endTime, используем точную логику ---
         if raw_events and 'startTime' in raw_events[0] and 'endTime' in raw_events[0]:
-            logger.info("Обнаружен формат startTime/endTime в API /event-timers. Используем точную логику.")
+            logger.info("Обнаружен формат startTime/endTime в API /events-schedule. Используем точную логику.")
             return _get_events_exact(raw_events)
         # --- Если нет startTime/endTime, но есть times, используем логику HH:MM ---
         elif raw_events and 'times' in raw_events[0]:
-            logger.info("Обнаружен формат times HH:MM в API /event-timers. Используем логику расписания.")
+            logger.info("Обнаружен формат times HH:MM в API /events-schedule. Используем логику расписания.")
             return _get_events_schedule(raw_events)
         else:
-            logger.error("Неизвестный формат ответа API /event-timers. Нет startTime/endTime или times.")
+            logger.error("Неизвестный формат ответа API /events-schedule. Нет startTime/endTime или times.")
             return [], []
 
     except requests.RequestException as e:
-        logger.error(f"Ошибка при получении данных из API (event-timers): {e}")
+        logger.error(f"Ошибка при получении данных из API (events-schedule): {e}")
         return [], []
     except Exception as e:
-        logger.error(f"Неожиданная ошибка при обработке данных из API (event-timers): {e}")
+        logger.error(f"Неожиданная ошибка при обработке данных из API (events-schedule): {e}")
         return [], []
 
 def _get_events_exact(raw_events):
@@ -128,7 +128,7 @@ def _get_events_exact(raw_events):
         end_timestamp_ms = event_obj.get('endTime')
 
         if not start_timestamp_ms or not end_timestamp_ms:
-            logger.warning(f"Missing start or end timestamp for event {name} at {location} in event-timers (exact)")
+            logger.warning(f"Missing start or end timestamp for event {name} at {location} in events-schedule (exact)")
             continue
 
         try:
@@ -204,7 +204,7 @@ def _get_events_exact(raw_events):
     # Сортировка будет корректной, так как start_time теперь aware
     upcoming_events.sort(key=lambda x: x['start_time'])
 
-    logger.info(f"Вычисление по API (event-timers - точная логика) завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
+    logger.info(f"Вычисление по API (events-schedule - точная логика) завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
     return active_events, upcoming_events
 
 def _get_events_schedule(raw_events):
@@ -231,7 +231,7 @@ def _get_events_schedule(raw_events):
             end_str = time_window.get('end')     # Например, "02:00" или "24:00"
 
             if not start_str or not end_str:
-                logger.warning(f"Missing start or end time for event {name} at {location} in event-timers (schedule)")
+                logger.warning(f"Missing start or end time for event {name} at {location} in events-schedule (HH:MM)")
                 continue
 
             try:
@@ -427,7 +427,7 @@ def _get_events_schedule(raw_events):
     # Сортировка будет корректной, так как start_time теперь aware
     upcoming_events.sort(key=lambda x: x['start_time'])
 
-    logger.info(f"Вычисление по API (event-timers - логика расписания) завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
+    logger.info(f"Вычисление по API (events-schedule - логика расписания) завершено: {len(active_events)} активных, {len(upcoming_events)} предстоящих.")
     return active_events, upcoming_events
 
 
@@ -498,10 +498,10 @@ async def process_callback_events(callback_query: types.CallbackQuery):
 # Функция отправки или редактирования сообщения с событиями
 async def send_events_message(message: types.Message, edit: bool = False):
     # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ -->
-    logger.info("Вызов send_events_message (использование API /event-timers, динамическая логика)")
-    # МЕНЯЕМ: вызываем get_arc_raiders_events_from_api_timers
-    active, upcoming = get_arc_raiders_events_from_api_timers()
-    logger.info(f"Получено из API (event-timers): {len(active)} активных, {len(upcoming)} предстоящих.")
+    logger.info("Вызов send_events_message (использование API /events-schedule, динамическая логика)")
+    # МЕНЯЕМ: вызываем get_arc_raiders_events_from_api_schedule
+    active, upcoming = get_arc_raiders_events_from_api_schedule()
+    logger.info(f"Получено из API (events-schedule): {len(active)} активных, {len(upcoming)} предстоящих.")
 
     # Форматируем активные события
     active_message = format_event_message(active, "active")
@@ -541,7 +541,7 @@ async def send_events_message(message: types.Message, edit: bool = False):
 @dp.callback_query(lambda c: c.data == 'refresh_events')
 async def process_callback_refresh_events(callback_query: types.CallbackQuery):
     # Вызываем send_events_message с edit=True
-    logger.info("Обработка callback 'refresh_events' (использование API /event-timers, динамическая логика)") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
+    logger.info("Обработка callback 'refresh_events' (использование API /events-schedule, динамическая логика)") # <-- ДОБАВЛЕНО ЛОГИРОВАНИЕ
     await send_events_message(callback_query.message, edit=True)
     # await callback_query.answer() # УБРАНО: edit_text или answer автоматически вызывают answer
 
@@ -608,7 +608,7 @@ def format_event_message(events, event_type="active"):
 
 # --- Основная функция запуска ---
 async def main():
-    logger.info("Запуск бота с использованием динамического API /event-timers (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
+    logger.info("Запуск бота с использованием динамического API /events-schedule (все предстоящие), кнопками ссылок, текстом об обновлении и редактированием сообщений...")
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
